@@ -152,14 +152,33 @@ def process_message(phone: str, message: str, message_id: str, client: dict, but
                 f"Type *COMMANDS* for full list.", client)
             return
 
-    # ── Human handoff mode ──────────────────────────
-    if session.get("human_mode"):
+    # ── BUTTON ID ROUTING ───────────────────────────
+    # Button taps send their ID as the message. Map them to
+    # the exact same commands the text flow uses so both paths work.
+    BUTTON_MAP = {
+        "btn_shop":          "menu",
+        "btn_cart":          "cart",
+        "btn_track":         "track",
+        "btn_help":          "help",
+        "btn_checkout":      "checkout",
+        "btn_continue":      "menu",
+        "btn_confirm_order": "btn_confirm_order",
+        "btn_change_addr":   "btn_change_addr",
+        "btn_cancel_order":  "cancel",
+        "btn_clear":         "btn_clear",
+        "btn_yes_clear":     "btn_yes_clear",
+        "btn_no":            "cart",
+    }
+    if button_id and button_id in BUTTON_MAP:
+        message   = BUTTON_MAP[button_id]
+        msg_lower = message.lower().strip()
+
+    # ── HUMAN MODE BLOCK ────────────────────────────
+    if session.get("human_mode") and msg_lower != "resume bot":
         wa.send_text(phone,
             "⚠️ You're connected to a human agent. They'll respond shortly.\n"
             "Type *RESUME BOT* to return to the AI assistant.", client)
         return
-
-    msg_lower = message.lower().strip()
 
     # ── RESUME BOT ──────────────────────────────────
     if msg_lower == "resume bot":
