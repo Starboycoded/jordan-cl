@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: jordan-commerce-os
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn core_system:app --workers 2 --timeout 120 --bind 0.0.0.0:$PORT
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: WHATSAPP_TOKEN
+        sync: false
+      - key: PHONE_NUMBER_ID
+        sync: false
+      - key: APP_SECRET
+        sync: false
+      - key: VERIFY_TOKEN
+        value: jordan_verify_2025
+      - key: ADMIN_SECRET
+        sync: false
+      - key: CATALOG_BASE_URL
+        sync: false
+      - key: BANK_DETAILS
+        sync: false
+      - key: PYTHON_VERSION
+        value: 3.11.9
