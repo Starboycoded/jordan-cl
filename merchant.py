@@ -391,3 +391,149 @@ def _notify_customer_of_status(order_ref: str, status: str, client: dict) -> Non
             wa.send_text(order["phone"], msg, client)
     except Exception as e:
         logger.error(f"[Notify] _notify_customer_of_status: {e}")
+
+
+# ─────────────────────────────────────────────────────
+# BOOKING NOTIFICATIONS
+# ─────────────────────────────────────────────────────
+
+def notify_new_appointment(appointment: dict, customer: dict, client: dict) -> bool:
+    merchant_phone = _merchant_phone(client)
+    if not merchant_phone:
+        logger.warning(f"[Notify] No merchant_phone for {client.get('slug')}")
+        return False
+
+    currency    = client.get("currency", "NGN")
+    ref         = appointment.get("ref", "N/A")
+    service     = appointment.get("service_name", "")
+    apt_date    = appointment.get("date", "")
+    apt_time    = appointment.get("time", "")
+    price       = float(appointment.get("price", 0))
+    notes       = appointment.get("notes", "")
+    cust_phone  = appointment.get("phone", "")
+    cust_name   = customer.get("name") or f"+{cust_phone}"
+
+    msg = (
+        f"📅 *New Appointment — {client.get('business_name', '')}*\n"
+        f"━━━━━━━━━━━━━━━━━━\n"
+        f"📋 Ref: *{ref}*\n"
+        f"👤 {cust_name} · +{cust_phone}\n"
+        f"💆 Service: *{service}*\n"
+        f"📅 Date: *{apt_date}*\n"
+        f"⏰ Time: *{apt_time}*\n"
+        f"💰 {currency} {int(price):,}\n"
+        + (f"📝 Notes: {notes}\n" if notes else "")
+        + f"━━━━━━━━━━━━━━━━━━\n"
+        f"Tap to update status:"
+    )
+    buttons = [
+        {"id": f"apt_confirm_{ref}",   "title": "✅ Confirm"},
+        {"id": f"apt_complete_{ref}",  "title": "🎉 Completed"},
+        {"id": f"apt_cancel_{ref}",    "title": "❌ Cancel"},
+    ]
+    return wa.send_buttons(merchant_phone, msg, buttons, client)
+
+
+def handle_appointment_button(btn: str, client: dict) -> str | None:
+    """Handle appointment status buttons from merchant."""
+    if not btn.startswith("apt_"):
+        return None
+    parts = btn.split("_", 2)
+    if len(parts) < 3:
+        return None
+
+    action = parts[1]
+    ref    = parts[2].upper()
+
+    status_map = {
+        "confirm":  ("confirmed",  "✅"),
+        "complete": ("completed",  "🎉"),
+        "cancel":   ("cancelled",  "❌"),
+        "noshow":   ("no_show",    "👻"),
+    }
+    status, icon = status_map.get(action, ("confirmed", "✅"))
+
+    import database as db_layer
+    client_id = str(client["id"])
+    ok = db_layer.update_appointment_status(ref, client_id, status)
+    if ok:
+        _notify_customer_appointment_status(ref, status, client)
+        return f"{icon} Appointment *{ref}* → *{status.title()}*\nCustomer notified. ✅"
+    return f"❌ Could not find appointment *{ref}*."
+
+
+def _notify_customer_appointment_status(ref: str, status: str, client: dict) -> None:
+    import database as db_layer
+    try:
+        apts  = db_layer.get_appointments(str(client["id"]), limit=500)
+        apt   = next((a for a in apts if a.get("ref") == ref), None)
+        if not apt:
+            return
+        msgs = {
+            "confirmed":  f"✅ Your appointment *{ref}* is confirmed!\nSee you on *{apt.get('date')}* at *{apt.get('time')}*. 😊",
+            "completed":  f"🎉 Thanks for visiting us! Your appointment *{ref}* is complete.\nWe hope to see you again!",
+            "cancelled":  f"❌ Your appointment *{ref}* has been cancelled.\nReply to rebook anytime.",
+            "no_show":    f"👋 We missed you for your *{ref}* appointment.\nReply *BOOK* to reschedule.",
+        }
+        msg = msgs.get(status)
+        if msg:
+            wa.send_text(apt["phone"], msg, client)
+    except Exception as e:
+        logger.error(f"[Notify] _notify_customer_appointment_status: {e}")
+
+
+# ─────────────────────────────────────────────────────
+# LEAD NOTIFICATIONS
+# ─────────────────────────────────────────────────────
+
+def notify_new_lead(lead_data: dict, customer: dict, client: dict,
+                    extra_note: str = None) -> bool:
+    merchant_phone = _merchant_phone(client)
+    if not merchant_phone:
+        return False
+
+    cust_phone  = customer.get("phone", "")
+    cust_name   = lead_data.get("name") or customer.get("name") or f"+{cust_phone}"
+
+    lines = (
+        f"🔥 *New Lead — {client.get('business_name', '')}*\n"
+        f"━━━━━━━━━━━━━━━━━━\n"
+        f"👤 Name: *{cust_name}*\n"
+        f"📞 Phone: +{cust_phone}\n"
+    )
+    for key, val in lead_data.items():
+        if key == "name" or not val:
+            continue
+        label = key.replace("_", " ").title()
+        lines += f"📌 {label}: {val}\n"
+
+    if extra_note:
+        lines += f"\n⚠️ Note: {extra_note}\n"
+
+    lines += (
+        f"━━━━━━━━━━━━━━━━━━\n"
+        f"Reply to update status:"
+    )
+    buttons = [
+        {"id": f"lead_contact_{cust_phone}",  "title": "📞 Mark Contacted"},
+        {"id": f"lead_qualify_{cust_phone}",  "title": "✅ Qualified"},
+        {"id": f"lead_lost_{cust_phone}",     "title": "❌ Not Interested"},
+    ]
+    return wa.send_buttons(merchant_phone, lines, buttons, client)
+
+
+# ─────────────────────────────────────────────────────
+# HUMAN HANDOFF NOTIFICATION
+# ─────────────────────────────────────────────────────
+
+def notify_human_handoff(phone: str, last_message: str, client: dict) -> bool:
+    merchant_phone = _merchant_phone(client)
+    if not merchant_phone:
+        return False
+    msg = (
+        f"🚨 *Human Handoff — {client.get('business_name', '')}*\n\n"
+        f"Customer +{phone} requested a human agent.\n"
+        f"Last message: \"{last_message[:100]}\"\n\n"
+        f"Please respond to them directly on WhatsApp."
+    )
+    return wa.send_text(merchant_phone, msg, client)
