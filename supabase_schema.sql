@@ -117,3 +117,85 @@ CREATE INDEX idx_sessions_lookup    ON sessions(client_id, phone);
 -- ══════════════════════════════════════════════════════
 INSERT INTO clients (slug, business_name, phone_number_id, template, currency)
 VALUES ('tech_squad', 'The Tech Squad', '989005180973554', 'electronics', 'NGN');
+
+
+-- ══════════════════════════════════════════════════════
+-- v5.3 ADDITIONS — Run these after the original schema
+-- ══════════════════════════════════════════════════════
+
+-- APPOINTMENTS (Booking template)
+CREATE TABLE IF NOT EXISTS appointments (
+    id           BIGSERIAL PRIMARY KEY,
+    client_id    UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+    ref          TEXT NOT NULL,
+    phone        TEXT NOT NULL,
+    customer_id  BIGINT REFERENCES customers(id),
+    service_name TEXT NOT NULL,
+    service_id   TEXT,
+    price        NUMERIC(12,2) DEFAULT 0,
+    date         TEXT NOT NULL,
+    time         TEXT NOT NULL,
+    notes        TEXT,
+    status       TEXT DEFAULT 'pending',   -- pending | confirmed | completed | cancelled | no_show
+    created_at   TIMESTAMPTZ DEFAULT NOW(),
+    updated_at   TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- LEADS (Lead Gen template)
+CREATE TABLE IF NOT EXISTS leads (
+    id           BIGSERIAL PRIMARY KEY,
+    client_id    UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+    ref          TEXT NOT NULL,
+    phone        TEXT NOT NULL,
+    customer_id  BIGINT REFERENCES customers(id),
+    name         TEXT,
+    location     TEXT,
+    budget       TEXT,
+    timeline     TEXT,
+    interest     TEXT,
+    data         JSONB DEFAULT '{}',       -- full lead data dict
+    status       TEXT DEFAULT 'new',       -- new | contacted | qualified | converted | lost
+    notes        TEXT,
+    created_at   TIMESTAMPTZ DEFAULT NOW(),
+    updated_at   TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- FAQS (Support template)
+CREATE TABLE IF NOT EXISTS faqs (
+    id           BIGSERIAL PRIMARY KEY,
+    client_id    UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+    question     TEXT NOT NULL,
+    answer       TEXT NOT NULL,
+    sort_order   INTEGER DEFAULT 0,
+    active       BOOLEAN DEFAULT TRUE,
+    created_at   TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Add extra columns to clients table for support template
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS business_hours TEXT;
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS contact_info   TEXT;
+
+-- Indexes
+CREATE INDEX IF NOT EXISTS idx_appointments_client ON appointments(client_id);
+CREATE INDEX IF NOT EXISTS idx_appointments_phone  ON appointments(phone);
+CREATE INDEX IF NOT EXISTS idx_appointments_date   ON appointments(date);
+CREATE INDEX IF NOT EXISTS idx_leads_client        ON leads(client_id);
+CREATE INDEX IF NOT EXISTS idx_leads_status        ON leads(status);
+CREATE INDEX IF NOT EXISTS idx_faqs_client         ON faqs(client_id) WHERE active = TRUE;
+
+
+-- ══════════════════════════════════════════════════════
+-- v5.3 SUBSCRIPTION & ADMIN COLUMNS
+-- Run after previous migrations
+-- ══════════════════════════════════════════════════════
+
+-- Add subscription plan fields to clients
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS plan             TEXT DEFAULT 'starter';
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS plan_expires_at  TIMESTAMPTZ;
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS feature_flags    JSONB DEFAULT '{}';
+
+-- Add notes to customers for issue tracking
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS notes TEXT;
+
+-- Index for plan lookups
+CREATE INDEX IF NOT EXISTS idx_clients_plan ON clients(plan);
