@@ -15,9 +15,15 @@ import database as db_layer
 import whatsapp as wa
 import ai_engine as ai
 import merchant as merch
-from templates_config import get_template, get_checkout_extras
+import booking_flow
+import leadgen_flow
+import support_flow
+import support_layer
+import subscriptions as subs
+from templates_config import get_template, get_checkout_extras, get_flow, COMMERCE_TEMPLATES
 from onboarding import onboarding
 from product_dashboard import dashboard
+from admin_panel import admin_panel
 
 # ─────────────────────────────────────────────────────
 # CONFIG
@@ -34,6 +40,7 @@ ANTHROPIC_KEY   = os.environ.get("ANTHROPIC_API_KEY", "")   # Set in Render env 
 app = Flask(__name__)
 app.register_blueprint(onboarding)
 app.register_blueprint(dashboard)
+app.register_blueprint(admin_panel)
 
 # In-memory session cache (backed by Supabase for persistence)
 _session_cache: dict = {}   # key: f"{client_id}:{phone}"
@@ -139,6 +146,11 @@ def process_message(phone: str, message: str, message_id: str, client: dict, but
 
     # ── MERCHANT COMMANDS (check before customer flow) ──
     if merch.is_merchant(phone, client):
+        if button_id and button_id.startswith("apt_"):
+            resp = merch.handle_appointment_button(button_id, client)
+            if resp:
+                wa.send_text(phone, resp, client)
+                return
         response = merch.handle_merchant_command(phone, message, button_id, client)
         if response:
             wa.send_text(phone, response, client)
@@ -152,7 +164,33 @@ def process_message(phone: str, message: str, message_id: str, client: dict, but
                 f"Type *COMMANDS* for full list.", client)
             return
 
-    # ── BUTTON ID ROUTING ───────────────────────────
+    # ── UNIVERSAL SUPPORT LAYER ─────────────────────
+    # Checked before flow dispatch — every template gets
+    # FAQ, human handoff, contact info, and issue reporting.
+    if support_layer.is_support_trigger(message, button_id) or session.get("state") == "reporting_issue":
+        handled = support_layer.handle(phone, message, button_id, client, session, customer)
+        if handled:
+            return
+
+    # ── FLOW DISPATCHER ─────────────────────────────
+    # Route to the correct conversation engine based on template.
+    # Commerce stays in this file. All others dispatch out.
+    flow = get_flow(client.get("template", "commerce"))
+
+    if flow == "booking":
+        booking_flow.handle(phone, message, button_id, client, session, customer)
+        return
+
+    if flow == "lead_gen":
+        leadgen_flow.handle(phone, message, button_id, client, session, customer)
+        return
+
+    if flow == "support":
+        support_flow.handle(phone, message, button_id, client, session, customer)
+        return
+
+    # flow == "commerce" — continues below
+    
     # Button taps send their ID as the message. Map them to
     # the exact same commands the text flow uses so both paths work.
     BUTTON_MAP = {
@@ -828,6 +866,10 @@ def broadcast():
     if not client:
         return jsonify({"error": "Client not found"}), 404
 
+    # Feature gate — broadcast requires Growth plan or above
+    if not subs.can(client, "broadcast"):
+        return jsonify({"error": subs.upgrade_message(client, "broadcast")}), 403
+
     customers = db_layer.get_all_customers(str(client["id"]))
     if not customers:
         return jsonify({"sent": 0, "failed": 0, "note": "No customers yet"})
@@ -1246,12 +1288,15 @@ def ping():
 def health():
     try:
         clients = db_layer.get_all_clients()
+        from storage import verify_bucket_exists
+        bucket_ok, bucket_msg = verify_bucket_exists()
         return jsonify({
-            "status":   "online",
-            "version":  "5.2",
-            "clients":  len(clients),
-            "ai":       "Claude (Anthropic)",
-            "product":  "Jordan by CodedLabs"
+            "status":        "online",
+            "version":       "5.3",
+            "clients":       len(clients),
+            "ai":            "Claude (Anthropic)",
+            "storage_bucket": "ok" if bucket_ok else bucket_msg,
+            "product":       "Jordan by CodedLabs"
         })
     except Exception as e:
         return jsonify({"status": "degraded", "error": str(e)}), 500
