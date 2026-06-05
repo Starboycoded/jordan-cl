@@ -232,3 +232,47 @@ def generate_invoice(order_ref: str, items: list, total: float,
         f"📌 Use *{order_ref}* as your payment reference.\n\n"
         f"Send your payment proof here once done ✅"
     )
+
+
+# ─────────────────────────────────────────────────────
+# SUPPORT CHAT  (FAQ-aware, no product catalogue)
+# ─────────────────────────────────────────────────────
+
+def chat_support(message: str, history: list, client: dict,
+                 faqs: list, customer: dict) -> tuple[str, int]:
+    """AI response for support template — uses FAQ knowledge base."""
+    biz_name = client.get("business_name", "us")
+    from templates_config import get_ai_persona
+    persona  = get_ai_persona(client.get("template", "support"))
+
+    faq_text = ""
+    if faqs:
+        faq_text = "\nKNOWLEDGE BASE:\n"
+        for faq in faqs:
+            faq_text += f"Q: {faq['question']}\nA: {faq['answer']}\n\n"
+
+    hours   = client.get("business_hours", "")
+    contact = client.get("contact_info", "")
+    extra   = ""
+    if hours:
+        extra += f"\nBusiness Hours:\n{hours}\n"
+    if contact:
+        extra += f"\nContact Info:\n{contact}\n"
+
+    system = (
+        f"{persona}\n\n"
+        f"ORGANISATION: {biz_name}\n"
+        f"{faq_text}"
+        f"{extra}\n"
+        f"If you don't know the answer, say so honestly and suggest the customer "
+        f"speak to a human agent by typing HUMAN.\n"
+        f"Keep replies under 150 words."
+    )
+
+    messages = []
+    for turn in history[-8:]:
+        if turn.get("role") in ("user", "assistant"):
+            messages.append({"role": turn["role"], "content": turn["content"]})
+    messages.append({"role": "user", "content": message})
+
+    return _claude(system, messages, MODEL_HAIKU, temperature=0.4, max_tokens=300)
