@@ -96,15 +96,18 @@ def onboard_step2():
             template = "general"
         return redirect(f"/onboard/step3?name={_q(name)}&slug={slug}&currency={currency}&template={template}")
 
+    from templates_config import get_business_types
+    business_types = get_business_types()
     template_cards = ""
-    for key, t in TEMPLATES.items():
+    for bt in business_types:
+        key = bt["key"]
         template_cards += f"""
 <label class="template-card" for="t_{key}">
-  <input type="radio" name="template" id="t_{key}" value="{key}" {"checked" if key == "general" else ""}>
+  <input type="radio" name="template" id="t_{key}" value="{key}" {"checked" if key == "commerce" else ""}>
   <div class="tc-inner">
-    <div class="tc-emoji">{t['emoji']}</div>
-    <div class="tc-name">{t['name']}</div>
-    <div class="tc-desc">{t['description']}</div>
+    <div class="tc-emoji">{bt['emoji']}</div>
+    <div class="tc-name">{bt['name']}</div>
+    <div class="tc-desc">{bt['desc']}</div>
   </div>
 </label>"""
 
