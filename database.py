@@ -342,3 +342,168 @@ def get_tokens_today(client_id: str) -> int:
         return r.data[0]["tokens"] if r.data else 0
     except:
         return 0
+
+
+# ─────────────────────────────────────────────────────
+# APPOINTMENTS (Booking template)
+# ─────────────────────────────────────────────────────
+
+def create_appointment(client_id: str, phone: str, service_name: str,
+                       service_id: str = None, price: float = 0,
+                       date: str = "", time: str = "",
+                       notes: str = "", customer_id: int = None) -> Optional[dict]:
+    try:
+        from datetime import date as dt
+        today = dt.today().strftime("%Y%m%d")
+        count_r = db().table("appointments").select("id", count="exact").eq("client_id", client_id).execute()
+        count   = (count_r.count or 0) + 1
+        ref     = f"APT-{today}-{count:04d}"
+
+        r = db().table("appointments").insert({
+            "client_id":    client_id,
+            "ref":          ref,
+            "phone":        phone,
+            "customer_id":  customer_id,
+            "service_name": service_name,
+            "service_id":   service_id,
+            "price":        price,
+            "date":         date,
+            "time":         time,
+            "notes":        notes,
+            "status":       "pending"
+        }).execute()
+        return r.data[0] if r.data else {"ref": ref}
+    except Exception as e:
+        logger.error(f"[DB] create_appointment: {e}")
+        return None
+
+
+def get_appointments(client_id: str, limit: int = 100, status: str = None) -> list:
+    try:
+        q = db().table("appointments").select("*").eq("client_id", client_id)\
+            .order("date", desc=True).limit(limit)
+        if status:
+            q = q.eq("status", status)
+        return q.execute().data or []
+    except Exception as e:
+        logger.error(f"[DB] get_appointments: {e}")
+        return []
+
+
+def get_customer_appointments(client_id: str, phone: str) -> list:
+    try:
+        r = db().table("appointments").select("*")\
+            .eq("client_id", client_id).eq("phone", phone)\
+            .order("date", desc=True).limit(5).execute()
+        return r.data or []
+    except Exception as e:
+        logger.error(f"[DB] get_customer_appointments: {e}")
+        return []
+
+
+def update_appointment_status(ref: str, client_id: str, status: str) -> bool:
+    try:
+        db().table("appointments").update({"status": status})\
+            .eq("ref", ref).eq("client_id", client_id).execute()
+        return True
+    except Exception as e:
+        logger.error(f"[DB] update_appointment_status: {e}")
+        return False
+
+
+# ─────────────────────────────────────────────────────
+# LEADS (Lead Gen template)
+# ─────────────────────────────────────────────────────
+
+def create_lead(client_id: str, phone: str, data: dict,
+                customer_id: int = None) -> Optional[dict]:
+    try:
+        from datetime import date as dt
+        today = dt.today().strftime("%Y%m%d")
+        count_r = db().table("leads").select("id", count="exact").eq("client_id", client_id).execute()
+        count   = (count_r.count or 0) + 1
+        ref     = f"LEAD-{today}-{count:04d}"
+
+        r = db().table("leads").insert({
+            "client_id":   client_id,
+            "ref":         ref,
+            "phone":       phone,
+            "customer_id": customer_id,
+            "name":        data.get("name", ""),
+            "location":    data.get("location", ""),
+            "budget":      data.get("budget", ""),
+            "timeline":    data.get("timeline", ""),
+            "interest":    data.get("interest", ""),
+            "data":        data,
+            "status":      "new"
+        }).execute()
+        return r.data[0] if r.data else {"ref": ref}
+    except Exception as e:
+        logger.error(f"[DB] create_lead: {e}")
+        return None
+
+
+def get_leads(client_id: str, limit: int = 100, status: str = None) -> list:
+    try:
+        q = db().table("leads").select("*").eq("client_id", client_id)\
+            .order("created_at", desc=True).limit(limit)
+        if status:
+            q = q.eq("status", status)
+        return q.execute().data or []
+    except Exception as e:
+        logger.error(f"[DB] get_leads: {e}")
+        return []
+
+
+def update_lead_status(ref: str, client_id: str, status: str) -> bool:
+    try:
+        db().table("leads").update({"status": status})\
+            .eq("ref", ref).eq("client_id", client_id).execute()
+        return True
+    except Exception as e:
+        logger.error(f"[DB] update_lead_status: {e}")
+        return False
+
+
+# ─────────────────────────────────────────────────────
+# FAQS (Support template)
+# ─────────────────────────────────────────────────────
+
+def get_faqs(client_id: str) -> list:
+    try:
+        r = db().table("faqs").select("*").eq("client_id", client_id)\
+            .eq("active", True).order("sort_order").execute()
+        return r.data or []
+    except Exception as e:
+        logger.error(f"[DB] get_faqs: {e}")
+        return []
+
+
+def create_faq(client_id: str, question: str, answer: str,
+               sort_order: int = 0) -> Optional[dict]:
+    try:
+        r = db().table("faqs").insert({
+            "client_id":  client_id,
+            "question":   question,
+            "answer":     answer,
+            "sort_order": sort_order,
+            "active":     True
+        }).execute()
+        return r.data[0] if r.data else None
+    except Exception as e:
+        logger.error(f"[DB] create_faq: {e}")
+        return None
+
+
+def update_faq(faq_id: int, client_id: str, updates: dict) -> bool:
+    try:
+        db().table("faqs").update(updates)\
+            .eq("id", faq_id).eq("client_id", client_id).execute()
+        return True
+    except Exception as e:
+        logger.error(f"[DB] update_faq: {e}")
+        return False
+
+
+def delete_faq(faq_id: int, client_id: str) -> bool:
+    return update_faq(faq_id, client_id, {"active": False})
