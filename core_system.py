@@ -135,6 +135,7 @@ def process_message(phone: str, message: str, message_id: str, client: dict, but
     client_id = str(client["id"])
     currency  = client.get("currency", "NGN")
     biz_name  = client.get("business_name", "Jordan")
+    msg_lower = message.lower().strip()      # defined here — safe for all checks below
 
     session   = _get_session(client_id, phone)
     products  = _get_products(client_id)
