@@ -6,11 +6,14 @@
 import os
 import json
 import base64
+import logging
+import mimetypes
 from flask import Blueprint, request, jsonify, abort
 import database as db_layer
 import storage as store
 from templates_config import get_template
 
+logger   = logging.getLogger(__name__)
 dashboard = Blueprint("dashboard", __name__)
 
 ADMIN_SECRET = os.environ.get("ADMIN_SECRET", "CodedLabs2025")
@@ -475,9 +478,18 @@ async function uploadImage(file){{
   var form=new FormData();
   form.append('image',file);
   form.append('slug',SLUG);
-  var r=await fetch(`/api/${{SLUG}}/upload-image?secret=${{SECRET}}`,{{method:'POST',body:form}});
-  var d=await r.json();
-  return d.url||null;
+  try{{
+    var r=await fetch(`/api/${{SLUG}}/upload-image?secret=${{SECRET}}`,{{method:'POST',body:form}});
+    var d=await r.json();
+    if(!r.ok){{
+      toast('Image upload failed: '+(d.error||r.status),'err');
+      return null;
+    }}
+    return d.url||null;
+  }}catch(e){{
+    toast('Image upload error: '+e.message,'err');
+    return null;
+  }}
 }}
 
 // ── DELETE ─────────────────────────────────────────
@@ -522,19 +534,27 @@ def upload_image(slug: str):
     file     = request.files["image"]
     filename = file.filename or "upload.jpg"
 
-    # Validate
-    allowed_mimes = {"image/jpeg", "image/png", "image/webp", "image/gif"}
-    if file.mimetype not in allowed_mimes:
-        return jsonify({"error": "Invalid file type. Use JPG, PNG, or WebP."}), 400
+    # Validate mimetype — fall back to filename extension if browser sends wrong type
+    allowed_mimes = {"image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"}
+    mime = file.mimetype or mimetypes.guess_type(filename)[0] or ""
+    if mime not in allowed_mimes:
+        # Last resort — check extension directly
+        ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+        if ext not in ("jpg", "jpeg", "png", "webp", "gif"):
+            return jsonify({"error": f"Invalid file type '{mime}'. Use JPG, PNG, or WebP."}), 400
 
     file_bytes = file.read()
     if len(file_bytes) > 5 * 1024 * 1024:
         return jsonify({"error": "File too large. Max 5MB."}), 400
 
-    url = store.upload_product_image(file_bytes, filename, slug)
+    url, err = store.upload_product_image(file_bytes, filename, slug)
+    if err:
+        logger.error(f"[Dashboard] Image upload error for {slug}: {err}")
+        return jsonify({"error": err}), 500
     if not url:
-        return jsonify({"error": "Upload failed"}), 500
+        return jsonify({"error": "Upload failed: no URL returned"}), 500
 
+    logger.info(f"[Dashboard] Image uploaded for {slug}: {url}")
     return jsonify({"url": url})
 
 
