@@ -9,7 +9,7 @@ import json
 import time
 import logging
 import threading
-from flask import Flask, request, jsonify, abort
+from flask import Flask, request, jsonify, abort, render_template
 
 import database as db_layer
 import whatsapp as wa
@@ -899,197 +899,25 @@ def storefront(slug: str):
     products  = db_layer.get_products(str(client["id"]))
     currency  = client.get("currency", "NGN")
     bot_phone = client.get("whatsapp_number", os.environ.get("BOT_PHONE", ""))
-    biz_name  = client.get("business_name", "Our Store")
 
-    # Template theming
-    t_cfg    = get_template(client.get("template", "general"))
-    primary  = t_cfg.get("primary", "#25D366")
-    bg       = t_cfg.get("bg",      "#07070e")
-    card_bg  = t_cfg.get("card_bg", "#0f1a14")
-    border   = t_cfg.get("border",  "#1a3020")
-    tagline  = t_cfg.get("tagline", "")
-    emoji    = t_cfg.get("emoji",   "🛍️")
+    t_cfg = get_template(client.get("template", "general"))
+    pdata = {str(p["id"]): {"name": p["name"], "price": float(p["price"])}
+             for p in products if int(p.get("stock", 0)) > 0}
 
-    cards = ""
-    pdata = {}
-    for p in products:
-        if int(p.get("stock", 0)) <= 0:
-            continue
-        pid = str(p["id"])
-        pdata[pid] = {"name": p["name"], "price": float(p["price"])}
-        img_html = (
-            f'<img src="{p["image_url"]}" alt="{p["name"]}" class="pi" loading="lazy">'
-            if p.get("image_url") else
-            f'<div class="pi pi-placeholder">{emoji}</div>'
-        )
-        cards += f"""<div class="card" id="c{pid}">
-  {img_html}
-  <div class="ci">
-    <p class="cn">{p['name']}</p>
-    <p class="cd">{p.get('description','')}</p>
-    <div class="cr">
-      <span class="cp">{currency} {int(float(p['price'])):,}</span>
-      <button class="btn-add" onclick="addItem({pid})">Add to Cart</button>
-    </div>
-  </div>
-</div>"""
-
-    pdata_json = json.dumps(pdata)
-
-    CSS = f"""
-:root{{--green:{primary};--dark:{bg};--card:{card_bg};--muted:#6b7c72;--red:#ff4444;--border:{border}}}
-*{{box-sizing:border-box;margin:0;padding:0}}
-body{{font-family:'Sora',sans-serif;background:var(--dark);color:#e8f5ec;min-height:100vh}}
-.hdr{{background:color-mix(in srgb,var(--dark) 60%,#000);border-bottom:1px solid var(--border);padding:16px 20px;position:sticky;top:0;z-index:50}}
-.hdr h1{{font-size:18px;font-weight:700;color:#fff}}
-.hdr p{{font-size:11px;color:var(--muted);margin-top:2px}}
-.grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;padding:16px}}
-.card{{background:var(--card);border-radius:14px;overflow:hidden;transition:transform .2s;border:1px solid var(--border)}}
-.card.inc{{border-color:var(--green)}}
-.card:hover{{transform:translateY(-2px)}}
-.pi{{width:100%;height:160px;object-fit:cover;display:block}}
-.pi-placeholder{{width:100%;height:160px;display:flex;align-items:center;justify-content:center;font-size:48px;background:var(--card)}}
-.ci{{padding:10px 12px 12px}}
-.cn{{font-size:13px;font-weight:600;margin-bottom:4px;line-height:1.3}}
-.cd{{font-size:11px;color:var(--muted);margin-bottom:8px;line-height:1.4;min-height:30px}}
-.cr{{display:flex;align-items:center;justify-content:space-between;gap:8px}}
-.cp{{font-size:13px;font-weight:700;color:var(--green)}}
-.btn-add{{background:var(--green);color:#000;border:none;border-radius:8px;padding:7px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;transition:all .15s;white-space:nowrap}}
-.btn-add:hover{{opacity:.85}}
-.btn-add.flash{{opacity:.7}}
-#toast{{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(20px);background:#1a3a24;color:#e8f5ec;padding:10px 18px;border-radius:20px;font-size:13px;opacity:0;transition:all .3s;pointer-events:none;white-space:nowrap;border:1px solid var(--green);z-index:200}}
-#toast.on{{opacity:1;transform:translateX(-50%) translateY(0)}}
-#cartBtn{{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1a3020;color:var(--green);border:2px solid #2d5a3a;border-radius:30px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Sora',sans-serif;transition:all .2s;z-index:100;box-shadow:0 4px 20px rgba(0,0,0,.4)}}
-#cartBtn.on{{background:var(--green);color:#000;border-color:var(--green)}}
-.cbadge{{background:rgba(0,0,0,.2);border-radius:20px;padding:2px 10px;margin-left:6px;font-size:12px}}
-#ov{{position:fixed;inset:0;background:rgba(0,0,0,.7);opacity:0;pointer-events:none;transition:opacity .3s;z-index:150}}
-#ov.on{{opacity:1;pointer-events:all}}
-#panel{{position:fixed;bottom:0;left:0;right:0;background:#0d1f14;border-radius:20px 20px 0 0;transform:translateY(100%);transition:transform .35s cubic-bezier(.4,0,.2,1);z-index:160;max-height:80vh;display:flex;flex-direction:column;border-top:1px solid #1a3020}}
-#panel.on{{transform:translateY(0)}}
-.ph{{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #1a3020;flex-shrink:0}}
-.pt{{font-size:15px;font-weight:700}}
-.px{{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer}}
-.pb{{flex:1;overflow-y:auto;padding:10px 20px}}
-.pe{{color:var(--muted);font-size:13px;text-align:center;padding:30px 0}}
-.row{{display:grid;grid-template-columns:1fr auto auto auto;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid #1a3020}}
-.rn{{font-size:13px;font-weight:600}}
-.rp{{font-size:12px;color:var(--green);font-weight:700;text-align:right;min-width:80px}}
-.qw{{display:flex;align-items:center;gap:5px}}
-.qb{{background:#1a3a24;border:1px solid #2d5a3a;color:var(--green);width:28px;height:28px;border-radius:6px;font-size:16px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s;flex-shrink:0}}
-.qb:hover{{background:#225530}}
-.qn{{font-size:14px;font-weight:700;min-width:20px;text-align:center}}
-.rd{{background:none;border:none;color:#444;cursor:pointer;font-size:16px;padding:4px;line-height:1;transition:color .15s}}
-.rd:hover{{color:var(--red)}}
-.pf{{padding:16px 20px;border-top:1px solid #1a3020;flex-shrink:0}}
-.tr{{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}}
-.tl{{font-size:14px;color:var(--muted)}}
-.tv{{font-size:22px;font-weight:700;color:var(--green)}}
-.bw{{width:100%;background:var(--green);color:#000;border:none;font-family:'Sora',sans-serif;font-weight:700;font-size:15px;padding:15px;border-radius:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:10px;transition:opacity .15s}}
-.bw:hover{{opacity:.85}}
-.bc{{width:100%;background:none;border:1px solid #2a2a2a;color:var(--muted);font-family:'Sora',sans-serif;font-size:12px;padding:10px;border-radius:8px;cursor:pointer;transition:all .15s}}
-.bc:hover{{border-color:var(--red);color:var(--red)}}
-.ftr{{text-align:center;padding:20px;font-size:11px;color:var(--muted);padding-bottom:80px}}
-.ftr a{{color:var(--green);text-decoration:none}}
-"""
-
-    JS = f"""
-var P={pdata_json};
-var PHONE="{bot_phone}";
-var cart={{}};
-var tt;
-function addItem(id){{
-  cart[id]=(cart[id]||0)+1;draw();
-  show_toast(P[id].name+' added! 🛒');
-  var c=document.getElementById('c'+id);
-  if(c)c.classList.add('inc');
-  var b=c?c.querySelector('.btn-add'):null;
-  if(b){{b.textContent='Added ✓';b.classList.add('flash');setTimeout(function(){{b.textContent='Add to Cart';b.classList.remove('flash');}},1400);}}
-}}
-function inc(id){{cart[id]=(cart[id]||0)+1;draw();}}
-function dec(id){{
-  cart[id]=(cart[id]||1)-1;
-  if(cart[id]<=0){{delete cart[id];var c=document.getElementById('c'+id);if(c)c.classList.remove('inc');}}
-  draw();if(!Object.keys(cart).length)close_panel();
-}}
-function del(id){{
-  delete cart[id];
-  var c=document.getElementById('c'+id);if(c)c.classList.remove('inc');
-  draw();if(!Object.keys(cart).length)close_panel();
-}}
-function clear_all(){{
-  cart={{}};
-  document.querySelectorAll('.card').forEach(function(c){{c.classList.remove('inc');}});
-  draw();close_panel();
-}}
-function draw(){{
-  var ids=Object.keys(cart);
-  var total=0,count=0,html='';
-  ids.forEach(function(id){{
-    var item=P[id],qty=cart[id],sub=item.price*qty;
-    total+=sub;count+=qty;
-    html+='<div class="row">'
-      +'<span class="rn">'+item.name+'</span>'
-      +'<div class="qw">'
-      +'<button class="qb" onclick="dec('+id+')">&#8722;</button>'
-      +'<span class="qn">'+qty+'</span>'
-      +'<button class="qb" onclick="inc('+id+')">&#43;</button>'
-      +'</div>'
-      +'<span class="rp">{currency} '+sub.toLocaleString()+'</span>'
-      +'<button class="rd" onclick="del('+id+')" title="Remove">&#x2715;</button>'
-      +'</div>';
-  }});
-  document.getElementById('pb').innerHTML=html||'<p class="pe">Your cart is empty</p>';
-  document.getElementById('tv').textContent='{currency} '+total.toLocaleString();
-  document.getElementById('cnt').textContent=count+(count===1?' item':' items');
-  var btn=document.getElementById('cartBtn');
-  if(count>0)btn.classList.add('on');else btn.classList.remove('on');
-}}
-function open_panel(){{document.getElementById('panel').classList.add('on');document.getElementById('ov').classList.add('on');}}
-function close_panel(){{document.getElementById('panel').classList.remove('on');document.getElementById('ov').classList.remove('on');}}
-function show_toast(m){{
-  var el=document.getElementById('toast');
-  el.textContent=m;el.classList.add('on');
-  clearTimeout(tt);tt=setTimeout(function(){{el.classList.remove('on');}},2200);
-}}
-function send_order(){{
-  var ids=Object.keys(cart);
-  if(!ids.length){{alert('Your cart is empty!');return;}}
-  var total=0,msg='Hi Jordan! I would like to order:\\n\\n';
-  ids.forEach(function(id){{
-    var item=P[id],qty=cart[id],sub=item.price*qty;
-    total+=sub;
-    msg+=qty+'x '+item.name+' - {currency} '+sub.toLocaleString()+'\\n';
-  }});
-  msg+='\\nTotal: {currency} '+total.toLocaleString();
-  msg+='\\n\\nPlease confirm my order!';
-  window.open('https://wa.me/'+PHONE+'?text='+encodeURIComponent(msg),'_blank');
-}}
-"""
-
-    return (
-        "<!DOCTYPE html><html lang='en'><head>"
-        "<meta charset='UTF-8'>"
-        "<meta name='viewport' content='width=device-width,initial-scale=1.0,maximum-scale=1.0'>"
-        f"<title>{biz_name}</title>"
-        "<link href='https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap' rel='stylesheet'>"
-        f"<style>{CSS}</style>"
-        "</head><body>"
-        f"<header class='hdr'><h1>{emoji} {biz_name}</h1><p>{tagline if tagline else 'Powered by Jordan'}</p></header>"
-        "<div id='toast'></div>"
-        f"<div class='grid'>{cards if cards else '<p style=\"text-align:center;padding:40px;color:#6b7c72\">No products available yet.</p>'}</div>"
-        f"<footer class='ftr'>Powered by Jordan &middot; <a href='https://wa.me/{bot_phone}'>Chat with us</a></footer>"
-        "<button id='cartBtn' onclick='open_panel()'>🛒 View Cart <span class='cbadge' id='cnt'>0 items</span></button>"
-        "<div id='ov' onclick='close_panel()'></div>"
-        "<div id='panel'>"
-        "<div class='ph'><span class='pt'>🛒 Your Cart</span><button class='px' onclick='close_panel()'>✕</button></div>"
-        "<div class='pb' id='pb'><p class='pe'>Your cart is empty</p></div>"
-        "<div class='pf'>"
-        "<div class='tr'><span class='tl'>Order Total</span><span class='tv' id='tv'>NGN 0</span></div>"
-        "<button class='bw' onclick='send_order()'>Send Order to WhatsApp</button>"
-        "<button class='bc' onclick='clear_all()'>Clear cart</button>"
-        "</div></div>"
-        f"<script>{JS}</script>"
-        "</body></html>"
+    return render_template("storefront.html",
+        client        = client,
+        products      = [p for p in products if int(p.get("stock", 0)) > 0],
+        currency      = currency,
+        bot_phone     = bot_phone,
+        products_json = json.dumps(pdata),
+        theme         = {
+            "primary": t_cfg.get("primary", "#25D366"),
+            "bg":      t_cfg.get("bg",      "#07070e"),
+            "card_bg": t_cfg.get("card_bg", "#0f1a14"),
+            "border":  t_cfg.get("border",  "#1a3020"),
+            "tagline": t_cfg.get("tagline", ""),
+            "emoji":   t_cfg.get("emoji",   "🛍️"),
+        }
     )
 
 
@@ -1098,173 +926,30 @@ function send_order(){{
 # ─────────────────────────────────────────────────────
 
 @app.route("/admin/<slug>")
+@app.route("/admin/<slug>")
 def admin_dashboard(slug: str):
     if request.args.get("secret") != ADMIN_SECRET:
-        return "Unauthorized", 403
-
+        return "Unauthorized. Add ?secret=YOUR_SECRET to the URL.", 403
     client = db_layer.get_client_by_slug(slug)
     if not client:
-        return "Client not found", 404
-
-    analytics = db_layer.get_analytics(str(client["id"]))
-    orders    = db_layer.get_orders(str(client["id"]), limit=100)
-    currency  = client.get("currency", "NGN")
-    biz_name  = client.get("business_name", slug)
-
-    status_icons = {"pending": "#f59e0b", "confirmed": "#3b82f6",
-                    "awaiting_payment": "#a78bfa", "paid": "#06b6d4",
-                    "processing": "#f97316", "delivered": "#22c55e", "cancelled": "#ef4444"}
-
-    order_rows = ""
-    for o in orders:
-        color = status_icons.get(o.get("status", "pending"), "#888")
-        items_summary = ", ".join(
-            f"{i['qty']}x {i['name']}" for i in (o.get("items") or [])
-        ) if o.get("items") else o.get("items", "—")
-        order_rows += f"""<tr>
-          <td class="mono">{o.get('order_ref','—')}</td>
-          <td>{o.get('phone','—')}</td>
-          <td class="sm muted">{items_summary}</td>
-          <td class="green">{currency} {int(float(o.get('total',0))):,}</td>
-          <td>{o.get('address','—')}</td>
-          <td><span class="badge" style="background:{color}22;color:{color}">{o.get('status','pending').title()}</span></td>
-          <td class="sm muted">{str(o.get('created_at',''))[:10]}</td>
-        </tr>"""
-
-    inv_rows = ""
-    for p in analytics["inventory"]:
-        stock = int(p.get("stock", 0))
-        sc    = "#ef4444" if stock == 0 else "#f59e0b" if stock <= 3 else "#22c55e"
-        inv_rows += f"""<tr>
-          <td><strong>{p.get('name','')}</strong></td>
-          <td class="green">{currency} {int(float(p.get('price',0))):,}</td>
-          <td class="sm muted">{p.get('description','')}</td>
-          <td><strong style="color:{sc}">{stock}</strong></td>
-          <td>
-            <button onclick="updateStatus('{slug}','{p.get('id')}','stock')"
-              style="background:#1a3020;border:1px solid #2d5a3a;color:#25D366;
-              padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11px">
-              Edit
-            </button>
-          </td>
-        </tr>"""
-
-    low_banner = (
-        f'<div class="alert">⚠️ Low/out of stock: {", ".join(analytics["low_stock"])}</div>'
-        if analytics["low_stock"] else ""
+        return "Client not found.", 404
+    analytics     = db_layer.get_analytics(str(client["id"]))
+    orders        = db_layer.get_orders(str(client["id"]), limit=100)
+    status_colors = {
+        "pending": "#f59e0b", "confirmed": "#3b82f6",
+        "awaiting_payment": "#a78bfa", "paid": "#06b6d4",
+        "processing": "#f97316", "delivered": "#22c55e", "cancelled": "#ef4444",
+    }
+    return render_template("admin.html",
+        client        = client,
+        secret        = request.args.get("secret", ""),
+        orders        = orders,
+        inventory     = analytics.get("inventory", []),
+        currency      = client.get("currency", "NGN"),
+        stats         = analytics,
+        status_colors = status_colors,
+        catalog_url   = f"{CATALOG_BASE}/{client.get('slug','')}",
     )
-
-    return f"""<!DOCTYPE html>
-<html lang="en"><head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{biz_name} — Jordan Admin</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
-<style>
-*,*::before,*::after{{box-sizing:border-box;margin:0;padding:0}}
-:root{{--bg:#07070e;--s:#10101a;--b:#1c1c2a;--g:#25D366;--text:#dde;--m:#555}}
-body{{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}}
-header{{background:var(--s);border-bottom:1px solid var(--b);padding:15px 28px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}}
-header h1{{font-size:16px;font-weight:700}}
-.tag{{font-size:10px;background:rgba(37,211,102,.15);color:var(--g);padding:3px 10px;border-radius:20px;font-weight:600}}
-.wrap{{max-width:1200px;margin:0 auto;padding:22px 24px 60px}}
-.stats{{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:24px}}
-.stat{{background:var(--s);border:1px solid var(--b);border-radius:14px;padding:18px}}
-.stat-n{{font-size:24px;font-weight:700;margin-bottom:2px}}
-.stat-l{{font-size:10px;color:var(--m);text-transform:uppercase;letter-spacing:.8px}}
-.alert{{background:#231400;border:1px solid #f59e0b;border-radius:10px;padding:11px 16px;font-size:13px;color:#f59e0b;margin-bottom:20px}}
-.card{{background:var(--s);border:1px solid var(--b);border-radius:14px;overflow:hidden;margin-bottom:22px}}
-.card-head{{padding:12px 18px;border-bottom:1px solid var(--b);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--m);display:flex;justify-content:space-between;align-items:center}}
-.tbl-wrap{{overflow-x:auto}}
-table{{width:100%;border-collapse:collapse;font-size:12px}}
-th{{padding:10px 14px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.7px;color:var(--m);font-weight:600;border-bottom:1px solid var(--b)}}
-td{{padding:10px 14px;border-top:1px solid var(--b);vertical-align:middle}}
-tr:hover td{{background:rgba(255,255,255,.015)}}
-.mono{{font-family:monospace;font-size:11px}}.muted{{color:var(--m)}}.sm{{font-size:11px}}
-.green{{color:var(--g);font-weight:600}}
-.badge{{padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700}}
-.bcast{{padding:18px}}.bcast p{{font-size:13px;color:var(--m);margin-bottom:10px}}
-textarea{{width:100%;background:#0b0b15;border:1px solid var(--b);border-radius:10px;color:var(--text);padding:12px;font-family:inherit;font-size:13px;resize:vertical;outline:none;transition:border-color .2s;min-height:90px}}
-textarea:focus{{border-color:var(--g)}}
-.btn{{background:var(--g);color:#000;border:none;padding:10px 22px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;transition:opacity .15s}}
-.btn:hover{{opacity:.85}}
-#result{{margin-top:10px;font-size:12px;color:var(--g);min-height:16px}}
-select{{background:#0b0b15;border:1px solid var(--b);color:var(--text);padding:4px 8px;border-radius:6px;font-size:11px}}
-</style></head><body>
-<header>
-  <h1>⚡ {biz_name} — Jordan Admin</h1>
-  <span class="tag">Jordan v5</span>
-</header>
-<div class="wrap">
-  <div class="stats">
-    <div class="stat"><div class="stat-n" style="color:var(--g)">{analytics['total_orders']}</div><div class="stat-l">Total Orders</div></div>
-    <div class="stat"><div class="stat-n" style="color:#f59e0b">{analytics['pending']}</div><div class="stat-l">Pending</div></div>
-    <div class="stat"><div class="stat-n" style="color:#22c55e">{analytics['delivered']}</div><div class="stat-l">Delivered</div></div>
-    <div class="stat"><div class="stat-n" style="color:#3b82f6">{analytics['total_customers']}</div><div class="stat-l">Customers</div></div>
-    <div class="stat"><div class="stat-n" style="color:#a78bfa">{currency} {int(analytics['revenue']):,}</div><div class="stat-l">Revenue</div></div>
-  </div>
-  {low_banner}
-  <div class="card">
-    <div class="card-head">
-      <span>📦 Orders (last 100)</span>
-      <select id="statusFilter" onchange="filterOrders()">
-        <option value="">All</option>
-        <option value="pending">Pending</option>
-        <option value="confirmed">Confirmed</option>
-        <option value="delivered">Delivered</option>
-        <option value="cancelled">Cancelled</option>
-      </select>
-    </div>
-    <div class="tbl-wrap"><table id="ordersTable">
-      <thead><tr><th>Ref</th><th>Phone</th><th>Items</th><th>Total</th><th>Address</th><th>Status</th><th>Date</th></tr></thead>
-      <tbody>{order_rows}</tbody>
-    </table></div>
-  </div>
-  <div class="card">
-    <div class="card-head"><span>🗃️ Inventory</span></div>
-    <div class="tbl-wrap"><table>
-      <thead><tr><th>Product</th><th>Price</th><th>Description</th><th>Stock</th><th>Actions</th></tr></thead>
-      <tbody>{inv_rows}</tbody>
-    </table></div>
-  </div>
-  <div class="card">
-    <div class="card-head"><span>📣 Broadcast</span></div>
-    <div class="bcast">
-      <p>Send a message to all {analytics['total_customers']} customers. Runs in background, rate-limited for safety.</p>
-      <textarea id="msg" placeholder="Flash sale today! 🔥 Visit our store: {CATALOG_BASE}/{slug}"></textarea>
-      <br><button class="btn" onclick="sendBroadcast()">Send to All Customers</button>
-      <div id="result"></div>
-    </div>
-  </div>
-</div>
-<script>
-const SLUG='{slug}';const SECRET='{ADMIN_SECRET}';
-async function sendBroadcast(){{
-  const msg=document.getElementById('msg').value.trim();
-  const r=document.getElementById('result');
-  if(!msg){{r.textContent='Write a message first.';return;}}
-  r.textContent='Starting broadcast...';
-  try{{
-    const res=await fetch('/broadcast',{{method:'POST',
-      headers:{{'Content-Type':'application/json'}},
-      body:JSON.stringify({{secret:SECRET,slug:SLUG,message:msg}})}});
-    const d=await res.json();
-    r.textContent=d.message||'Broadcast started!';
-  }}catch(e){{r.textContent='Broadcast failed.';}}
-}}
-async function updateStatus(slug,ref,field){{
-  const newStatus=prompt('New status: pending / confirmed / delivered / cancelled');
-  if(!newStatus)return;
-  const res=await fetch(`/api/${{slug}}/orders/${{ref}}/status`,{{
-    method:'PUT',
-    headers:{{'Content-Type':'application/json'}},
-    body:JSON.stringify({{secret:SECRET,status:newStatus,notify_customer:true}})
-  }});
-  const d=await res.json();
-  if(d.success){{alert('Updated! Refreshing...');location.reload();}}
-  else alert('Update failed.');
-}}
-</script>
-</body></html>"""
 
 
 # ─────────────────────────────────────────────────────
