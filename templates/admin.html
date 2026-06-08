@@ -1,1 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ client.business_name }} — Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { --bg:#07070e; --s:#10101a; --b:#1c1c2a; --g:#25D366; --text:#dde; --m:#555; --red:#ef4444; --warn:#f59e0b; }
+    body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+    header { background: var(--s); border-bottom: 1px solid var(--b); padding: 15px 28px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
+    header h1 { font-size: 16px; font-weight: 700; }
+    .tag { font-size: 10px; background: rgba(37,211,102,.15); color: var(--g); padding: 3px 10px; border-radius: 20px; font-weight: 600; }
+    .hdr-links { display: flex; gap: 8px; }
+    .hdr-link { color: var(--g); font-size: 12px; text-decoration: none; background: var(--b); padding: 6px 12px; border-radius: 6px; transition: opacity .15s; }
+    .hdr-link:hover { opacity: .85; }
+    .wrap { max-width: 1200px; margin: 0 auto; padding: 22px 24px 60px; }
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 24px; }
+    .stat { background: var(--s); border: 1px solid var(--b); border-radius: 14px; padding: 18px; }
+    .stat-n { font-size: 24px; font-weight: 700; margin-bottom: 2px; }
+    .stat-l { font-size: 10px; color: var(--m); text-transform: uppercase; letter-spacing: .8px; }
+    .alert { background: #231400; border: 1px solid var(--warn); border-radius: 10px; padding: 11px 16px; font-size: 13px; color: var(--warn); margin-bottom: 20px; }
+    .card { background: var(--s); border: 1px solid var(--b); border-radius: 14px; overflow: hidden; margin-bottom: 22px; }
+    .card-head { padding: 12px 18px; border-bottom: 1px solid var(--b); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--m); display: flex; justify-content: space-between; align-items: center; }
+    .tbl-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th { padding: 10px 14px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .7px; color: var(--m); font-weight: 600; border-bottom: 1px solid var(--b); }
+    td { padding: 10px 14px; border-top: 1px solid var(--b); vertical-align: middle; }
+    tr:hover td { background: rgba(255,255,255,.015); }
+    .mono { font-family: monospace; font-size: 11px; }
+    .muted { color: var(--m); }
+    .sm { font-size: 11px; }
+    .green { color: var(--g); font-weight: 600; }
+    .badge { padding: 3px 10px; border-radius: 20px; font-size: 10px; font-weight: 700; }
+    .bcast { padding: 18px; }
+    .bcast p { font-size: 13px; color: var(--m); margin-bottom: 10px; }
+    textarea { width: 100%; background: #0b0b15; border: 1px solid var(--b); border-radius: 10px; color: var(--text); padding: 12px; font-family: inherit; font-size: 13px; resize: vertical; outline: none; transition: border-color .2s; min-height: 90px; }
+    textarea:focus { border-color: var(--g); }
+    select { background: #0b0b15; border: 1px solid var(--b); color: var(--text); padding: 4px 8px; border-radius: 6px; font-size: 11px; }
+    .btn { background: var(--g); color: #000; border: none; padding: 10px 22px; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer; transition: opacity .15s; font-family: inherit; }
+    .btn:hover { opacity: .85; }
+    #result { margin-top: 10px; font-size: 12px; color: var(--g); min-height: 16px; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>⚡ {{ client.business_name }} — Admin</h1>
+  <div class="hdr-links">
+    <a href="/shop/{{ client.slug }}" target="_blank" class="hdr-link">🛍️ Storefront</a>
+    <a href="/dashboard/{{ client.slug }}?secret={{ secret }}" class="hdr-link">📦 Products</a>
+    <span class="tag">Jordan v5</span>
+  </div>
+</header>
 
+<div class="wrap">
+  <div class="stats">
+    <div class="stat"><div class="stat-n" style="color:var(--g)">{{ stats.total_orders }}</div><div class="stat-l">Total Orders</div></div>
+    <div class="stat"><div class="stat-n" style="color:var(--warn)">{{ stats.pending }}</div><div class="stat-l">Pending</div></div>
+    <div class="stat"><div class="stat-n" style="color:#22c55e">{{ stats.delivered }}</div><div class="stat-l">Delivered</div></div>
+    <div class="stat"><div class="stat-n" style="color:#3b82f6">{{ stats.total_customers }}</div><div class="stat-l">Customers</div></div>
+    <div class="stat"><div class="stat-n" style="color:#22c55e">{{ currency }} {{ '{:,}'.format(stats.revenue | int) }}</div><div class="stat-l">Revenue</div></div>
+    <div class="stat"><div class="stat-n" style="color:#a78bfa">{{ stats.tokens_today | default(0) | '{:,}'.format }}</div><div class="stat-l">AI Tokens</div></div>
+  </div>
+
+  {% if stats.low_stock %}
+  <div class="alert">⚠️ Low / out of stock: {{ stats.low_stock | join(', ') }}</div>
+  {% endif %}
+
+  <!-- ORDERS -->
+  <div class="card">
+    <div class="card-head">
+      <span>📦 Orders (last 100)</span>
+      <select id="statusFilter" onchange="filterOrders(this.value)">
+        <option value="">All</option>
+        <option value="pending">Pending</option>
+        <option value="confirmed">Confirmed</option>
+        <option value="delivered">Delivered</option>
+        <option value="cancelled">Cancelled</option>
+      </select>
+    </div>
+    <div class="tbl-wrap">
+      <table id="ordersTable">
+        <thead><tr><th>Ref</th><th>Phone</th><th>Items</th><th>Total</th><th>Address</th><th>Status</th><th>Date</th></tr></thead>
+        <tbody>
+          {% for o in orders %}
+          {% set color = status_colors.get(o.status, '#888') %}
+          <tr>
+            <td class="mono">{{ o.order_ref }}</td>
+            <td>{{ o.phone }}</td>
+            <td class="sm muted">
+              {% if o.items is iterable and o.items is not string %}
+                {% for item in o.items %}{{ item.qty }}x {{ item.name }}{% if not loop.last %}, {% endif %}{% endfor %}
+              {% else %}
+                {{ o.items }}
+              {% endif %}
+            </td>
+            <td class="green">{{ currency }} {{ '{:,}'.format(o.total | int) }}</td>
+            <td class="sm muted">{{ (o.address or '')[:35] }}</td>
+            <td><span class="badge" style="background:{{ color }}22;color:{{ color }}">{{ o.status | title }}</span></td>
+            <td class="sm muted">{{ (o.created_at | string)[:10] }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="7" style="text-align:center;color:var(--m);padding:30px">No orders yet</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- INVENTORY -->
+  <div class="card">
+    <div class="card-head"><span>🗃️ Inventory</span></div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Product</th><th>Price</th><th>Stock</th><th>Status</th></tr></thead>
+        <tbody>
+          {% for p in inventory %}
+          {% set stock = p.stock | int %}
+          {% set sc = '#ef4444' if stock == 0 else '#f59e0b' if stock <= 3 else '#22c55e' %}
+          <tr>
+            <td><strong>{{ p.name }}</strong></td>
+            <td class="green">{{ currency }} {{ '{:,}'.format(p.price | int) }}</td>
+            <td><strong style="color:{{ sc }}">{{ stock }}</strong></td>
+            <td><span class="badge" style="background:{{ sc }}22;color:{{ sc }}">
+              {{ 'Out of Stock' if stock == 0 else 'Low Stock' if stock <= 3 else 'In Stock' }}
+            </span></td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" style="text-align:center;color:var(--m);padding:30px">No products yet</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- BROADCAST -->
+  <div class="card">
+    <div class="card-head"><span>📣 Broadcast</span></div>
+    <div class="bcast">
+      <p>Send a message to all {{ stats.total_customers }} customers. Runs in background, rate-limited for safety.</p>
+      <textarea id="msg" placeholder="Flash sale today! 🔥 Visit our store: {{ catalog_url }}"></textarea>
+      <br><button class="btn" onclick="sendBroadcast()">Send to All Customers</button>
+      <div id="result"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SLUG = '{{ client.slug }}';
+const SECRET = '{{ secret }}';
+
+async function sendBroadcast() {
+  const msg = document.getElementById('msg').value.trim();
+  const r = document.getElementById('result');
+  if (!msg) { r.textContent = 'Write a message first.'; return; }
+  r.textContent = 'Starting broadcast...';
+  try {
+    const res = await fetch('/broadcast', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ secret: SECRET, slug: SLUG, message: msg })
+    });
+    const d = await res.json();
+    r.textContent = d.message || 'Broadcast started!';
+  } catch(e) { r.textContent = 'Broadcast failed.'; }
+}
+
+function filterOrders(status) {
+  const rows = document.querySelectorAll('#ordersTable tbody tr');
+  rows.forEach(row => {
+    const badge = row.querySelector('.badge');
+    if (!status || !badge || badge.textContent.trim().toLowerCase() === status) {
+      row.style.display = '';
+    } else {
+      row.style.display = 'none';
+    }
+  });
+}
+</script>
+</body>
+</html>
