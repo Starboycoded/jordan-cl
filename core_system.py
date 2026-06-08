@@ -15,12 +15,10 @@ import database as db_layer
 import whatsapp as wa
 import ai_engine as ai
 import merchant as merch
-import booking_flow
-import leadgen_flow
-import support_flow
-import support_layer
+import router as msg_router
 import subscriptions as subs
-from templates_config import get_template, get_checkout_extras, get_flow, COMMERCE_TEMPLATES
+from templates_config import get_template, get_checkout_extras
+from modules import get_enabled_modules
 from onboarding import onboarding
 from product_dashboard import dashboard
 from admin_panel import admin_panel
@@ -165,32 +163,12 @@ def process_message(phone: str, message: str, message_id: str, client: dict, but
                 f"Type *COMMANDS* for full list.", client)
             return
 
-    # ── UNIVERSAL SUPPORT LAYER ─────────────────────
-    # Checked before flow dispatch — every template gets
-    # FAQ, human handoff, contact info, and issue reporting.
-    if support_layer.is_support_trigger(message, button_id) or session.get("state") == "reporting_issue":
-        handled = support_layer.handle(phone, message, button_id, client, session, customer)
-        if handled:
-            return
+    # ── MODULE ROUTER ───────────────────────────────
+    # All message routing handled by router.py.
+    # Support runs first (universal), then enabled modules.
+    msg_router.route(phone, message, button_id, client, session, customer)
+    return
 
-    # ── FLOW DISPATCHER ─────────────────────────────
-    # Route to the correct conversation engine based on template.
-    # Commerce stays in this file. All others dispatch out.
-    flow = get_flow(client.get("template", "commerce"))
-
-    if flow == "booking":
-        booking_flow.handle(phone, message, button_id, client, session, customer)
-        return
-
-    if flow == "lead_gen":
-        leadgen_flow.handle(phone, message, button_id, client, session, customer)
-        return
-
-    if flow == "support":
-        support_flow.handle(phone, message, button_id, client, session, customer)
-        return
-
-    # flow == "commerce" — continues below
     
     # Button taps send their ID as the message. Map them to
     # the exact same commands the text flow uses so both paths work.
@@ -841,7 +819,8 @@ def api_update_client(slug: str):
 
     updates = request.json or {}
     allowed = {"business_name", "greeting", "template", "currency",
-               "phone_number_id", "wa_token", "whatsapp_number", "merchant_phone", "ai_model", "active"}
+               "phone_number_id", "wa_token", "whatsapp_number", "merchant_phone",
+               "ai_model", "active", "modules_config", "plan"}
     updates = {k: v for k, v in updates.items() if k in allowed}
 
     ok = db_layer.update_client(str(client["id"]), updates)
@@ -926,30 +905,159 @@ def storefront(slug: str):
 # ─────────────────────────────────────────────────────
 
 @app.route("/admin/<slug>")
-@app.route("/admin/<slug>")
 def admin_dashboard(slug: str):
+    """Legacy admin route — renders the same unified dashboard."""
+    return product_dashboard(slug)
+
+
+@app.route("/dashboard/<slug>")
+def product_dashboard(slug: str):
+    """Unified modular dashboard — sections depend on enabled modules."""
     if request.args.get("secret") != ADMIN_SECRET:
         return "Unauthorized. Add ?secret=YOUR_SECRET to the URL.", 403
     client = db_layer.get_client_by_slug(slug)
     if not client:
         return "Client not found.", 404
-    analytics     = db_layer.get_analytics(str(client["id"]))
-    orders        = db_layer.get_orders(str(client["id"]), limit=100)
+
+    client_id    = str(client["id"])
+    modules      = get_enabled_modules(client)
+    analytics    = db_layer.get_analytics(client_id)
+    t_cfg        = get_template(client.get("template", "general"))
+    currency     = client.get("currency", "NGN")
+
+    orders       = db_layer.get_orders(client_id, limit=100) if modules.get("commerce") else []
+    products     = db_layer.get_products(client_id)          if modules.get("commerce") else []
+    appointments = db_layer.get_appointments(client_id)      if modules.get("booking")  else []
+    leads        = db_layer.get_leads(client_id)             if modules.get("leadgen")  else []
+    faqs         = db_layer.get_faqs(client_id)              if modules.get("support")  else []
+
     status_colors = {
         "pending": "#f59e0b", "confirmed": "#3b82f6",
         "awaiting_payment": "#a78bfa", "paid": "#06b6d4",
         "processing": "#f97316", "delivered": "#22c55e", "cancelled": "#ef4444",
     }
-    return render_template("admin.html",
+
+    return render_template("dashboard.html",
         client        = client,
+        slug          = slug,
         secret        = request.args.get("secret", ""),
-        orders        = orders,
-        inventory     = analytics.get("inventory", []),
-        currency      = client.get("currency", "NGN"),
+        modules       = modules,
+        currency      = currency,
+        primary       = t_cfg.get("primary", "#25D366"),
+        plan          = client.get("plan", "starter"),
         stats         = analytics,
+        low_stock     = analytics.get("low_stock", []),
+        products      = products,
+        orders        = orders,
+        appointments  = appointments,
+        leads         = leads,
+        faqs          = faqs,
         status_colors = status_colors,
-        catalog_url   = f"{CATALOG_BASE}/{client.get('slug','')}",
+        catalog_url   = f"{CATALOG_BASE}/{slug}",
     )
+
+
+
+# ─────────────────────────────────────────────────────
+# APPOINTMENT API
+# ─────────────────────────────────────────────────────
+
+@app.route("/api/<slug>/appointments/<ref>/status", methods=["PUT"])
+def api_update_appointment(slug: str, ref: str):
+    if not _require_admin(request):
+        return jsonify({"error": "Unauthorized"}), 403
+    client = db_layer.get_client_by_slug(slug)
+    if not client:
+        return jsonify({"error": "Client not found"}), 404
+    body   = request.json or {}
+    status = body.get("status", "")
+    valid  = {"pending", "confirmed", "completed", "cancelled", "no_show"}
+    if status not in valid:
+        return jsonify({"error": f"Status must be one of: {valid}"}), 400
+    ok = db_layer.update_appointment_status(ref, str(client["id"]), status)
+    if ok:
+        from merchant import _notify_customer_appointment_status
+        import threading
+        threading.Thread(target=_notify_customer_appointment_status,
+            args=(ref, status, client), daemon=True).start()
+    return jsonify({"success": ok})
+
+
+# ─────────────────────────────────────────────────────
+# LEAD API
+# ─────────────────────────────────────────────────────
+
+@app.route("/api/<slug>/leads/<ref>/status", methods=["PUT"])
+def api_update_lead(slug: str, ref: str):
+    if not _require_admin(request):
+        return jsonify({"error": "Unauthorized"}), 403
+    client = db_layer.get_client_by_slug(slug)
+    if not client:
+        return jsonify({"error": "Client not found"}), 404
+    body   = request.json or {}
+    status = body.get("status", "")
+    valid  = {"new", "contacted", "qualified", "converted", "lost"}
+    if status not in valid:
+        return jsonify({"error": f"Status must be one of: {valid}"}), 400
+    ok = db_layer.update_lead_status(ref, str(client["id"]), status)
+    return jsonify({"success": ok})
+
+
+# ─────────────────────────────────────────────────────
+# FAQ API
+# ─────────────────────────────────────────────────────
+
+@app.route("/api/<slug>/faqs", methods=["GET"])
+def api_list_faqs(slug: str):
+    client = db_layer.get_client_by_slug(slug)
+    if not client:
+        return jsonify({"error": "Client not found"}), 404
+    faqs = db_layer.get_faqs(str(client["id"]))
+    return jsonify({"faqs": faqs})
+
+
+@app.route("/api/<slug>/faqs", methods=["POST"])
+def api_create_faq(slug: str):
+    if not _require_admin(request):
+        return jsonify({"error": "Unauthorized"}), 403
+    client = db_layer.get_client_by_slug(slug)
+    if not client:
+        return jsonify({"error": "Client not found"}), 404
+    body = request.json or {}
+    if not body.get("question") or not body.get("answer"):
+        return jsonify({"error": "question and answer required"}), 400
+    faq = db_layer.create_faq(
+        client_id  = str(client["id"]),
+        question   = body["question"],
+        answer     = body["answer"],
+        sort_order = int(body.get("sort_order", 0))
+    )
+    return jsonify({"success": True, "faq": faq}), 201
+
+
+@app.route("/api/<slug>/faqs/<int:faq_id>", methods=["PUT"])
+def api_update_faq(slug: str, faq_id: int):
+    if not _require_admin(request):
+        return jsonify({"error": "Unauthorized"}), 403
+    client = db_layer.get_client_by_slug(slug)
+    if not client:
+        return jsonify({"error": "Client not found"}), 404
+    body    = request.json or {}
+    allowed = {"question", "answer", "sort_order", "active"}
+    updates = {k: v for k, v in body.items() if k in allowed}
+    ok = db_layer.update_faq(faq_id, str(client["id"]), updates)
+    return jsonify({"success": ok})
+
+
+@app.route("/api/<slug>/faqs/<int:faq_id>", methods=["DELETE"])
+def api_delete_faq(slug: str, faq_id: int):
+    if not _require_admin(request):
+        return jsonify({"error": "Unauthorized"}), 403
+    client = db_layer.get_client_by_slug(slug)
+    if not client:
+        return jsonify({"error": "Client not found"}), 404
+    ok = db_layer.delete_faq(faq_id, str(client["id"]))
+    return jsonify({"success": ok})
 
 
 # ─────────────────────────────────────────────────────
