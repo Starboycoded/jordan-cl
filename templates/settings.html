@@ -1,1 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Settings — {{ client.business_name }}</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{--bg:#07070e;--s:#10101a;--b:#1c1c2a;--g:#25D366;--text:#dde;--m:#666;--red:#ef4444}
+    body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+    header{background:var(--s);border-bottom:1px solid var(--b);padding:14px 24px;display:flex;align-items:center;gap:12px;position:sticky;top:0}
+    .back{color:var(--m);text-decoration:none;font-size:13px}.back:hover{color:var(--text)}
+    header h1{font-size:15px;font-weight:700}
+    .wrap{max-width:600px;margin:0 auto;padding:28px 20px 60px}
+    .card{background:var(--s);border:1px solid var(--b);border-radius:16px;padding:24px;margin-bottom:20px}
+    .card h2{font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--m);margin-bottom:18px}
+    .field{margin-bottom:14px}
+    label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--m);margin-bottom:6px}
+    .hint{font-weight:400;text-transform:none;letter-spacing:0;opacity:.7}
+    .inp{width:100%;background:#0b0b15;border:1px solid var(--b);border-radius:10px;color:var(--text);padding:11px 13px;font-family:inherit;font-size:13px;outline:none;transition:border-color .2s}
+    .inp:focus{border-color:var(--g)}
+    textarea.inp{resize:vertical;min-height:70px}
+    .btn{background:var(--g);color:#000;border:none;padding:12px 24px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;transition:opacity .15s}
+    .btn:hover{opacity:.85}
+    .result{font-size:12px;color:var(--g);margin-top:10px;min-height:16px}
+  </style>
+</head>
+<body>
+<header>
+  <a href="/dashboard/{{ client.slug }}?secret={{ secret }}" class="back">← Products</a>
+  <h1>Settings — {{ client.business_name }}</h1>
+</header>
+<div class="wrap">
 
+  <div class="card">
+    <h2>🏪 Store Details</h2>
+    <div class="field"><label>Business Name</label>
+      <input class="inp" id="s-name" value="{{ client.business_name or '' }}">
+    </div>
+    <div class="field"><label>Template / Business Type</label>
+      <select class="inp" id="s-template">
+        {% for bt in business_types %}
+        <option value="{{ bt.key }}" {{ 'selected' if bt.key == client.template else '' }}>{{ bt.emoji }} {{ bt.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field"><label>Currency</label>
+      <select class="inp" id="s-currency">
+        {% for c in currencies %}
+        <option value="{{ c }}" {{ 'selected' if c == (client.currency or 'NGN') else '' }}>{{ c }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field"><label>AI Model <span class="hint">(Haiku = fast &amp; affordable · Sonnet = premium)</span></label>
+      <select class="inp" id="s-model">
+        <option value="claude-haiku-4-5" {{ 'selected' if (client.ai_model or 'claude-haiku-4-5') == 'claude-haiku-4-5' else '' }}>Claude Haiku — Default (fast, affordable)</option>
+        <option value="claude-sonnet-4-6" {{ 'selected' if client.ai_model == 'claude-sonnet-4-6' else '' }}>Claude Sonnet — Premium (smarter, higher cost)</option>
+      </select>
+    </div>
+    <div class="field"><label>Greeting Message</label>
+      <textarea class="inp" id="s-greeting">{{ client.greeting or '' }}</textarea>
+    </div>
+    <div class="field"><label>Opening Hours <span class="hint">(shown when customer asks)</span></label>
+      <textarea class="inp" id="s-hours" placeholder="Mon–Fri: 9am – 6pm&#10;Sat: 10am – 4pm&#10;Sun: Closed">{{ client.business_hours or '' }}</textarea>
+    </div>
+    <div class="field"><label>Contact Info <span class="hint">(shown when customer asks for contact)</span></label>
+      <textarea class="inp" id="s-contact" placeholder="Phone: 080XXXXXXXX&#10;Email: hello@yourbiz.com&#10;Address: 12 Lagos Street, Ikeja">{{ client.contact_info or '' }}</textarea>
+    </div>
+    <button class="btn" onclick="save()">Save Changes</button>
+    <div class="result" id="result"></div>
+  </div>
+
+  <div class="card">
+    <h2>📲 WhatsApp Connection</h2>
+    <div class="field"><label>Phone Number ID <span class="hint">(from Meta → WhatsApp → API Setup)</span></label>
+      <input class="inp" id="s-phone-id" value="{{ client.phone_number_id or '' }}">
+    </div>
+    <div class="field"><label>Access Token</label>
+      <input class="inp" id="s-token" type="password" placeholder="EAAxxxxxxxx..." value="{{ client.wa_token or '' }}">
+    </div>
+    <div class="field"><label>WhatsApp Number <span class="hint">(with country code, no +)</span></label>
+      <input class="inp" id="s-wa-number" value="{{ client.whatsapp_number or '' }}">
+    </div>
+    <div class="field"><label>Your (Merchant) WhatsApp <span class="hint">(receives order notifications)</span></label>
+      <input class="inp" id="s-merchant-phone" value="{{ client.merchant_phone or '' }}">
+    </div>
+    <button class="btn" onclick="saveWA()">Save WhatsApp Settings</button>
+    <div class="result" id="wa-result"></div>
+  </div>
+
+</div>
+<script>
+const SECRET = '{{ secret }}';
+const SLUG = '{{ client.slug }}';
+
+async function save() {
+  const r = await fetch(`/api/${SLUG}?secret=${SECRET}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      business_name: document.getElementById('s-name').value,
+      template:      document.getElementById('s-template').value,
+      currency:      document.getElementById('s-currency').value,
+      ai_model:      document.getElementById('s-model').value,
+      greeting:      document.getElementById('s-greeting').value,
+      business_hours:document.getElementById('s-hours').value,
+      contact_info:  document.getElementById('s-contact').value,
+      secret: SECRET
+    })
+  });
+  document.getElementById('result').textContent = (await r.json()).success ? 'Saved ✅' : 'Failed ❌';
+}
+
+async function saveWA() {
+  const r = await fetch(`/api/${SLUG}?secret=${SECRET}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      phone_number_id: document.getElementById('s-phone-id').value,
+      wa_token:        document.getElementById('s-token').value,
+      whatsapp_number: document.getElementById('s-wa-number').value,
+      merchant_phone:  document.getElementById('s-merchant-phone').value,
+      secret: SECRET
+    })
+  });
+  document.getElementById('wa-result').textContent = (await r.json()).success ? 'Saved ✅' : 'Failed ❌';
+}
+</script>
+</body>
+</html>
