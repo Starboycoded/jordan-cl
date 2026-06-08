@@ -1,1 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ client.business_name }} — Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{--bg:#07070e;--s:#10101a;--b:#1c1c2a;--g:{{ primary|default('#25D366') }};--text:#dde;--m:#555;--red:#ef4444;--warn:#f59e0b}
+    body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+    header{background:var(--s);border-bottom:1px solid var(--b);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:30}
+    header h1{font-size:15px;font-weight:700}
+    .tag{font-size:10px;background:rgba(255,255,255,.07);color:var(--m);padding:3px 10px;border-radius:20px;margin-left:8px}
+    .hdr-links{display:flex;gap:8px}
+    .hdr-btn{background:var(--b);border:1px solid #2a2a3a;color:var(--text);padding:7px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;text-decoration:none;font-family:inherit;transition:all .15s}
+    .hdr-btn:hover{border-color:var(--g);color:var(--g)}
+    .nav{display:flex;gap:4px;padding:16px 24px 0;border-bottom:1px solid var(--b);overflow-x:auto}
+    .nav-tab{padding:9px 16px;border-radius:8px 8px 0 0;font-size:12px;font-weight:600;cursor:pointer;border:none;background:none;color:var(--m);font-family:inherit;white-space:nowrap;transition:all .15s;border-bottom:2px solid transparent}
+    .nav-tab.active{color:var(--g);border-bottom-color:var(--g);background:rgba(37,211,102,.07)}
+    .nav-tab:hover:not(.active){color:var(--text)}
+    .wrap{max-width:1200px;margin:0 auto;padding:24px 20px 60px}
+    .section{display:none}.section.active{display:block}
+    .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:24px}
+    .stat{background:var(--s);border:1px solid var(--b);border-radius:12px;padding:16px}
+    .stat-n{font-size:22px;font-weight:700;margin-bottom:2px}
+    .stat-l{font-size:10px;color:var(--m);text-transform:uppercase;letter-spacing:.7px}
+    .card{background:var(--s);border:1px solid var(--b);border-radius:14px;overflow:hidden;margin-bottom:20px}
+    .card-head{padding:12px 18px;border-bottom:1px solid var(--b);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--m);display:flex;justify-content:space-between;align-items:center}
+    .tbl-wrap{overflow-x:auto}
+    table{width:100%;border-collapse:collapse;font-size:12px}
+    th{padding:10px 14px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.7px;color:var(--m);font-weight:600;border-bottom:1px solid var(--b)}
+    td{padding:10px 14px;border-top:1px solid var(--b);vertical-align:middle}
+    tr:hover td{background:rgba(255,255,255,.015)}
+    .prod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;padding:16px}
+    .pcard{background:var(--bg);border:1px solid var(--b);border-radius:12px;overflow:hidden}
+    .pcard img,.pcard-ph{width:100%;height:120px;object-fit:cover;display:block}
+    .pcard-ph{display:flex;align-items:center;justify-content:center;font-size:32px;background:#0d0d18}
+    .pcard-body{padding:10px}
+    .pcard-name{font-size:12px;font-weight:700;margin-bottom:3px}
+    .pcard-price{font-size:12px;color:var(--g);font-weight:700;margin-bottom:4px}
+    .pcard-stock{font-size:10px;margin-bottom:8px}
+    .stock-ok{color:#22c55e}.stock-low{color:var(--warn)}.stock-out{color:var(--red)}
+    .pcard-actions{display:flex;gap:6px}
+    .pcard-actions button{flex:1;padding:5px 0;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;border:none;font-family:inherit}
+    .act-edit{background:var(--b);color:var(--text);border:1px solid #2a2a3a!important}
+    .act-del{background:rgba(239,68,68,.1);color:var(--red)}
+    .badge{padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700}
+    .mono{font-family:monospace;font-size:11px}.muted{color:var(--m)}.sm{font-size:11px}.green{color:var(--g);font-weight:600}
+    .inp{width:100%;background:#0b0b15;border:1px solid var(--b);border-radius:10px;color:var(--text);padding:11px 13px;font-family:inherit;font-size:13px;outline:none;transition:border-color .2s;display:block;margin-bottom:12px}
+    .inp:focus{border-color:var(--g)}
+    textarea.inp{resize:vertical;min-height:80px}
+    label.lbl{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--m);margin-bottom:6px}
+    .inp-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .form-wrap{padding:18px}
+    .btn{border:none;padding:10px 20px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;transition:opacity .15s}
+    .btn-g{background:var(--g);color:#000}.btn-g:hover{opacity:.85}
+    .btn-ghost{background:var(--b);color:var(--text);border:1px solid #2a2a3a}
+    .btn-sm{background:var(--b);border:1px solid #2a2a3a;color:var(--text);padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;font-family:inherit}
+    .btn-sm:hover{border-color:var(--g);color:var(--g)}
+    .result,.bcast-result{font-size:12px;color:var(--g);margin-top:8px;min-height:16px}
+    .alert{background:#231400;border:1px solid var(--warn);border-radius:10px;padding:11px 16px;font-size:13px;color:var(--warn);margin-bottom:20px}
+    .empty-state{text-align:center;padding:40px;color:var(--m);font-size:13px}
+    .overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);opacity:0;pointer-events:none;transition:opacity .3s;z-index:100;display:flex;align-items:center;justify-content:center;padding:16px}
+    .overlay.on{opacity:1;pointer-events:all}
+    .modal{background:var(--s);border:1px solid var(--b);border-radius:18px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;padding:24px;transform:translateY(20px);transition:transform .3s}
+    .overlay.on .modal{transform:translateY(0)}
+    .modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+    .modal-title{font-size:16px;font-weight:700}
+    .modal-close{background:none;border:none;color:var(--m);font-size:22px;cursor:pointer}
+    .modal-footer{display:flex;gap:10px;margin-top:20px}
+    .modal-footer button{flex:1}
+    .img-zone{border:2px dashed var(--b);border-radius:12px;padding:16px;text-align:center;cursor:pointer;transition:all .2s;position:relative;overflow:hidden;margin-bottom:12px}
+    .img-zone:hover{border-color:var(--g);background:#0a1f0f}
+    .img-zone input{position:absolute;inset:0;opacity:0;cursor:pointer}
+    .img-preview{width:100%;height:120px;object-fit:cover;border-radius:8px;display:none}
+    .toggle-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid var(--b)}
+    .toggle-lbl{font-size:13px;font-weight:600}
+    .toggle{position:relative;width:44px;height:24px}
+    .toggle input{opacity:0;width:0;height:0}
+    .toggle-slider{position:absolute;inset:0;background:#2a2a3a;border-radius:99px;cursor:pointer;transition:.2s}
+    .toggle-slider::before{content:'';position:absolute;width:18px;height:18px;left:3px;top:3px;background:#888;border-radius:50%;transition:.2s}
+    .toggle input:checked+.toggle-slider{background:var(--g)}
+    .toggle input:checked+.toggle-slider::before{transform:translateX(20px);background:#000}
+    #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(10px);background:#1a3a24;color:#e8f5ec;padding:11px 20px;border-radius:20px;font-size:13px;opacity:0;transition:all .25s;pointer-events:none;z-index:300;border:1px solid var(--g);white-space:nowrap}
+    #toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+    #toast.err{background:#2a0a0a;border-color:var(--red);color:#fca5a5}
+    .apt-grid{display:grid;gap:10px;padding:16px}
+    .apt-card{background:var(--bg);border:1px solid var(--b);border-left:3px solid var(--g);border-radius:8px;padding:12px;display:grid;grid-template-columns:1fr auto;align-items:center;gap:12px}
+    .apt-name{font-size:13px;font-weight:700;margin-bottom:3px}
+    .apt-meta{font-size:11px;color:var(--m)}
+    select.status-sel{background:var(--b);border:1px solid #2a2a3a;color:var(--text);padding:5px 8px;border-radius:6px;font-size:11px;cursor:pointer;font-family:inherit}
+    .pipeline{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;padding:16px}
+    .pipe-col{background:var(--bg);border:1px solid var(--b);border-radius:10px;padding:12px}
+    .pipe-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--m);margin-bottom:8px}
+    .lead-card{background:var(--s);border:1px solid var(--b);border-radius:8px;padding:10px;margin-bottom:8px;font-size:12px}
+    .lead-name{font-weight:700;margin-bottom:3px}
+    .lead-meta{color:var(--m);font-size:11px;margin-bottom:2px}
+    .faq-list{padding:16px;display:grid;gap:10px}
+    .faq-item{background:var(--bg);border:1px solid var(--b);border-radius:10px;padding:14px}
+    .faq-q{font-size:13px;font-weight:700;margin-bottom:6px}
+    .faq-a{font-size:12px;color:var(--m);line-height:1.6}
+    .faq-actions{display:flex;gap:6px;margin-top:10px}
+  </style>
+</head>
+<body>
 
+<header>
+  <div style="display:flex;align-items:center;gap:8px">
+    <h1>⚡ {{ client.business_name }}</h1>
+    <span class="tag">{{ plan | default('starter') | title }}</span>
+  </div>
+  <div class="hdr-links">
+    {% if modules.commerce %}
+    <a href="/shop/{{ client.slug }}" target="_blank" class="hdr-btn">🛍️ Store</a>
+    {% endif %}
+    <a href="/dashboard/{{ client.slug }}/settings?secret={{ secret }}" class="hdr-btn">⚙️ Settings</a>
+  </div>
+</header>
+
+<div class="nav">
+  {% set first = true %}
+  {% if modules.commerce %}
+  <button class="nav-tab {{ 'active' if first }}" onclick="showSection('products',this)">📦 Products</button>
+  <button class="nav-tab" onclick="showSection('orders',this)">🛒 Orders</button>
+  {% set first = false %}
+  {% endif %}
+  {% if modules.booking %}
+  <button class="nav-tab {{ 'active' if first }}" onclick="showSection('appointments',this)">📅 Appointments</button>
+  {% set first = false %}
+  {% endif %}
+  {% if modules.leadgen %}
+  <button class="nav-tab {{ 'active' if first }}" onclick="showSection('leads',this)">🔥 Leads</button>
+  {% set first = false %}
+  {% endif %}
+  {% if modules.support %}
+  <button class="nav-tab" onclick="showSection('faqs',this)">❓ FAQs</button>
+  {% endif %}
+  <button class="nav-tab" onclick="showSection('broadcast',this)">📣 Broadcast</button>
+  <button class="nav-tab" onclick="showSection('analytics',this)">📊 Analytics</button>
+</div>
+
+<div class="wrap">
+
+{% if modules.commerce %}
+<div class="section active" id="section-products">
+  {% if low_stock %}<div class="alert">⚠️ Low / out of stock: {{ low_stock | join(', ') }}</div>{% endif %}
+  <div class="card">
+    <div class="card-head">
+      <span>🗃️ Products</span>
+      <button class="btn-sm" style="background:var(--g);color:#000;border-color:var(--g)" onclick="openAddProduct()">+ Add Product</button>
+    </div>
+    <div class="prod-grid">
+      {% for p in products %}
+      {% set stock = p.stock | int %}
+      {% set sc = 'stock-out' if stock == 0 else 'stock-low' if stock <= 3 else 'stock-ok' %}
+      <div class="pcard">
+        {% if p.image_url %}<img src="{{ p.image_url }}" alt="{{ p.name }}" loading="lazy">
+        {% else %}<div class="pcard-ph">🛍️</div>{% endif %}
+        <div class="pcard-body">
+          <div class="pcard-name">{{ p.name }}</div>
+          <div class="pcard-price">{{ currency }} {{ '{:,}'.format(p.price | int) }}</div>
+          <div class="pcard-stock {{ sc }}">{{ 'Out of Stock' if stock == 0 else (stock|string + ' left') if stock <= 3 else (stock|string + ' in stock') }}</div>
+          <div class="pcard-actions">
+            <button class="act-edit" onclick="editProduct({{ p.id }},'{{ p.name | replace("'","\\'") }}',{{ p.price }},{{ p.stock }},'{{ (p.description or '') | replace("'","\\'") }}','{{ p.image_url or "" }}')">✏️ Edit</button>
+            <button class="act-del" onclick="deleteProduct({{ p.id }},'{{ p.name | replace("'","\\'") }}')">🗑️</button>
+          </div>
+        </div>
+      </div>
+      {% else %}
+      <div class="empty-state" style="grid-column:1/-1">No products yet. Click + Add Product to get started.</div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="section" id="section-orders">
+  <div class="stats">
+    <div class="stat"><div class="stat-n" style="color:var(--g)">{{ stats.total_orders }}</div><div class="stat-l">Total Orders</div></div>
+    <div class="stat"><div class="stat-n" style="color:var(--warn)">{{ stats.pending }}</div><div class="stat-l">Pending</div></div>
+    <div class="stat"><div class="stat-n" style="color:#22c55e">{{ stats.delivered }}</div><div class="stat-l">Delivered</div></div>
+    <div class="stat"><div class="stat-n" style="color:var(--g)">{{ currency }} {{ '{:,}'.format(stats.revenue | int) }}</div><div class="stat-l">Revenue</div></div>
+  </div>
+  <div class="card">
+    <div class="card-head">
+      <span>📦 Orders</span>
+      <select onchange="filterOrders(this.value)">
+        <option value="">All Status</option>
+        <option value="pending">Pending</option>
+        <option value="confirmed">Confirmed</option>
+        <option value="paid">Paid</option>
+        <option value="delivered">Delivered</option>
+        <option value="cancelled">Cancelled</option>
+      </select>
+    </div>
+    <div class="tbl-wrap">
+      <table id="ordersTable">
+        <thead><tr><th>Ref</th><th>Phone</th><th>Items</th><th>Total</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
+        <tbody>
+          {% for o in orders %}
+          {% set sc = status_colors.get(o.status, '#888') %}
+          <tr data-status="{{ o.status }}">
+            <td class="mono">{{ o.order_ref }}</td>
+            <td class="sm">{{ o.phone }}</td>
+            <td class="sm muted">{% if o.items is iterable and o.items is not string %}{% for i in o.items %}{{ i.qty }}x {{ i.name }}{% if not loop.last %}, {% endif %}{% endfor %}{% else %}{{ o.items }}{% endif %}</td>
+            <td class="green">{{ currency }} {{ '{:,}'.format(o.total | int) }}</td>
+            <td><span class="badge" style="background:{{ sc }}22;color:{{ sc }}">{{ o.status | title }}</span></td>
+            <td class="sm muted">{{ (o.created_at | string)[:10] }}</td>
+            <td>
+              <select class="status-sel" onchange="updateOrderStatus('{{ o.order_ref }}', this.value)">
+                <option value="">Update…</option>
+                <option value="confirmed">Confirm</option>
+                <option value="paid">Mark Paid</option>
+                <option value="delivered">Delivered</option>
+                <option value="cancelled">Cancel</option>
+              </select>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="7" class="empty-state">No orders yet</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if modules.booking %}
+<div class="section {% if not modules.commerce %}active{% endif %}" id="section-appointments">
+  <div class="card">
+    <div class="card-head">
+      <span>📅 Appointments</span>
+      <select onchange="filterApts(this.value)">
+        <option value="">All</option>
+        <option value="pending">Pending</option>
+        <option value="confirmed">Confirmed</option>
+        <option value="completed">Completed</option>
+        <option value="cancelled">Cancelled</option>
+      </select>
+    </div>
+    <div class="apt-grid" id="appointmentsGrid">
+      {% for a in appointments %}
+      {% set sc = '#f59e0b' if a.status == 'pending' else '#22c55e' if a.status in ('confirmed','completed') else '#ef4444' %}
+      <div class="apt-card" style="border-left-color:{{ sc }}" data-status="{{ a.status }}">
+        <div>
+          <div class="apt-name">{{ a.service_name }}</div>
+          <div class="apt-meta">📅 {{ a.date }} at {{ a.time }}</div>
+          <div class="apt-meta">📞 +{{ a.phone }}</div>
+          {% if a.notes %}<div class="apt-meta">📝 {{ a.notes }}</div>{% endif %}
+          <div class="apt-meta" style="color:{{ sc }}">{{ a.status | title }}</div>
+        </div>
+        <select class="status-sel" onchange="updateAptStatus('{{ a.ref }}', this.value)">
+          <option value="">Update…</option>
+          <option value="confirmed">Confirm</option>
+          <option value="completed">Completed</option>
+          <option value="no_show">No Show</option>
+          <option value="cancelled">Cancel</option>
+        </select>
+      </div>
+      {% else %}
+      <div class="empty-state">No appointments yet</div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if modules.leadgen %}
+<div class="section {% if not modules.commerce and not modules.booking %}active{% endif %}" id="section-leads">
+  <div class="card">
+    <div class="card-head"><span>🔥 Lead Pipeline</span></div>
+    <div class="pipeline">
+      {% for status_key, status_label in [('new','🆕 New'),('contacted','📞 Contacted'),('qualified','✅ Qualified'),('converted','🎉 Won'),('lost','❌ Lost')] %}
+      <div class="pipe-col">
+        <div class="pipe-title">{{ status_label }}</div>
+        {% for lead in leads if lead.status == status_key %}
+        <div class="lead-card">
+          <div class="lead-name">{{ lead.name or '+' + lead.phone }}</div>
+          {% if lead.location %}<div class="lead-meta">📍 {{ lead.location }}</div>{% endif %}
+          {% if lead.budget %}<div class="lead-meta">💰 {{ lead.budget }}</div>{% endif %}
+          <div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap">
+            {% if status_key == 'new' %}<button class="btn-sm" onclick="updateLeadStatus('{{ lead.ref }}','contacted')">📞 Call</button>{% endif %}
+            {% if status_key != 'qualified' and status_key != 'converted' %}<button class="btn-sm" onclick="updateLeadStatus('{{ lead.ref }}','qualified')">✅ Qualify</button>{% endif %}
+            {% if status_key == 'qualified' %}<button class="btn-sm" onclick="updateLeadStatus('{{ lead.ref }}','converted')">🎉 Won</button>{% endif %}
+          </div>
+        </div>
+        {% else %}
+        {% if loop.first %}<div style="font-size:11px;color:var(--m);padding:4px 0">—</div>{% endif %}
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if modules.support %}
+<div class="section" id="section-faqs">
+  <div class="card">
+    <div class="card-head">
+      <span>❓ FAQs</span>
+      <button class="btn-sm" style="background:var(--g);color:#000;border-color:var(--g)" onclick="openAddFaq()">+ Add FAQ</button>
+    </div>
+    <div class="faq-list">
+      {% for faq in faqs %}
+      <div class="faq-item">
+        <div class="faq-q">{{ faq.question }}</div>
+        <div class="faq-a">{{ faq.answer }}</div>
+        <div class="faq-actions">
+          <button class="btn-sm" onclick="editFaq({{ faq.id }},'{{ faq.question|replace("'","\\'")|replace('"','\\"') }}','{{ faq.answer|replace("'","\\'")|replace('"','\\"') }}')">✏️ Edit</button>
+          <button class="btn-sm" style="color:var(--red)" onclick="deleteFaq({{ faq.id }})">🗑️ Delete</button>
+        </div>
+      </div>
+      {% else %}
+      <div class="empty-state">No FAQs yet. Add common questions your customers ask.</div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="section" id="section-broadcast">
+  <div class="card">
+    <div class="card-head"><span>📣 Broadcast</span></div>
+    <div class="form-wrap">
+      <p style="font-size:13px;color:var(--m);margin-bottom:12px">Send a message to all {{ stats.total_customers }} customers. Runs in background, rate-limited.</p>
+      <label class="lbl">Message</label>
+      <textarea class="inp" id="bcast-msg" placeholder="Flash sale today! 🔥"></textarea>
+      <button class="btn btn-g" onclick="sendBroadcast()">Send to All Customers</button>
+      <div id="bcast-result" class="result"></div>
+    </div>
+  </div>
+</div>
+
+<div class="section" id="section-analytics">
+  <div class="stats">
+    <div class="stat"><div class="stat-n" style="color:var(--g)">{{ stats.total_orders }}</div><div class="stat-l">Total Orders</div></div>
+    <div class="stat"><div class="stat-n" style="color:#3b82f6">{{ stats.total_customers }}</div><div class="stat-l">Customers</div></div>
+    <div class="stat"><div class="stat-n" style="color:#22c55e">{{ currency }} {{ '{:,}'.format(stats.revenue | int) }}</div><div class="stat-l">Revenue</div></div>
+    {% if modules.booking %}<div class="stat"><div class="stat-n" style="color:#a78bfa">{{ appointments | length }}</div><div class="stat-l">Appointments</div></div>{% endif %}
+    {% if modules.leadgen %}<div class="stat"><div class="stat-n" style="color:var(--warn)">{{ leads | length }}</div><div class="stat-l">Leads</div></div>{% endif %}
+    <div class="stat"><div class="stat-n" style="color:var(--m)">{{ stats.tokens_today | default(0) }}</div><div class="stat-l">AI Tokens Today</div></div>
+  </div>
+  {% if stats.low_stock %}<div class="alert">⚠️ Low stock: {{ stats.low_stock | join(', ') }}</div>{% endif %}
+</div>
+
+</div><!-- end wrap -->
+
+<!-- PRODUCT MODAL -->
+<div class="overlay" id="prodModal" onclick="if(event.target===this)this.classList.remove('on')">
+  <div class="modal">
+    <div class="modal-head">
+      <span class="modal-title" id="prodModalTitle">Add Product</span>
+      <button class="modal-close" onclick="document.getElementById('prodModal').classList.remove('on')">✕</button>
+    </div>
+    <div class="img-zone" ondragover="event.preventDefault()" ondrop="onDrop(event)">
+      <input type="file" accept="image/*" onchange="onFile(event)" id="prod-img-input">
+      <img class="img-preview" id="prod-img-preview" alt="preview">
+      <div id="prod-img-text"><div style="font-size:28px;margin-bottom:6px">📷</div><div style="font-size:12px;color:var(--m)">Drop image or click to upload · Max 5MB</div></div>
+    </div>
+    <input type="hidden" id="prod-img-url">
+    <label class="lbl">Name *</label>
+    <input type="text" class="inp" id="prod-name">
+    <div class="inp-row">
+      <div><label class="lbl">Price ({{ currency }}) *</label><input type="number" class="inp" id="prod-price" min="0"></div>
+      <div><label class="lbl">Stock</label><input type="number" class="inp" id="prod-stock" min="0" value="0"></div>
+    </div>
+    <label class="lbl">Description</label>
+    <textarea class="inp" id="prod-desc" rows="2"></textarea>
+    <div class="toggle-row">
+      <span class="toggle-lbl">Active</span>
+      <label class="toggle"><input type="checkbox" id="prod-active" checked><span class="toggle-slider"></span></label>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="document.getElementById('prodModal').classList.remove('on')">Cancel</button>
+      <button class="btn btn-g" id="prod-save-btn" onclick="saveProduct()">Save</button>
+    </div>
+    <div id="prod-result" class="result"></div>
+  </div>
+</div>
+
+<!-- FAQ MODAL -->
+<div class="overlay" id="faqModal" onclick="if(event.target===this)this.classList.remove('on')">
+  <div class="modal">
+    <div class="modal-head">
+      <span class="modal-title" id="faqModalTitle">Add FAQ</span>
+      <button class="modal-close" onclick="document.getElementById('faqModal').classList.remove('on')">✕</button>
+    </div>
+    <input type="hidden" id="faq-id">
+    <label class="lbl">Question *</label>
+    <input type="text" class="inp" id="faq-q" placeholder="e.g. What are your opening hours?">
+    <label class="lbl">Answer *</label>
+    <textarea class="inp" id="faq-a" rows="4"></textarea>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="document.getElementById('faqModal').classList.remove('on')">Cancel</button>
+      <button class="btn btn-g" onclick="saveFaq()">Save</button>
+    </div>
+    <div id="faq-result" class="result"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const SLUG='{{ client.slug }}',SECRET='{{ secret }}',CURRENCY='{{ currency }}';
+let editProd=null,editFaq=null,prodFile=null,tt;
+
+function showSection(name,tab){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  const el=document.getElementById('section-'+name);
+  if(el)el.classList.add('active');
+  if(tab)tab.classList.add('active');
+}
+function filterOrders(s){document.querySelectorAll('#ordersTable tbody tr').forEach(r=>{r.style.display=(!s||r.dataset.status===s)?'':'none'});}
+function filterApts(s){document.querySelectorAll('#appointmentsGrid .apt-card').forEach(c=>{c.style.display=(!s||c.dataset.status===s)?'':'none'});}
+
+async function updateOrderStatus(ref,status){
+  if(!status)return;
+  const r=await fetch(`/api/${SLUG}/orders/${ref}/status?secret=${SECRET}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status,notify_customer:true})});
+  const d=await r.json();
+  toast(d.success?`${ref} → ${status} ✅`:'Failed',d.success?'':'err');
+  if(d.success)setTimeout(()=>location.reload(),800);
+}
+async function updateAptStatus(ref,status){
+  if(!status)return;
+  const r=await fetch(`/api/${SLUG}/appointments/${ref}/status?secret=${SECRET}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status})});
+  const d=await r.json();
+  toast(d.success?`Updated ✅`:'Failed',d.success?'':'err');
+  if(d.success)setTimeout(()=>location.reload(),800);
+}
+async function updateLeadStatus(ref,status){
+  const r=await fetch(`/api/${SLUG}/leads/${ref}/status?secret=${SECRET}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status})});
+  const d=await r.json();
+  toast(d.success?'Updated ✅':'Failed',d.success?'':'err');
+  if(d.success)setTimeout(()=>location.reload(),800);
+}
+
+function openAddProduct(){
+  editProd=null;prodFile=null;
+  document.getElementById('prodModalTitle').textContent='Add Product';
+  document.getElementById('prod-save-btn').textContent='Add Product';
+  ['prod-name','prod-desc'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('prod-price').value='';
+  document.getElementById('prod-stock').value='0';
+  document.getElementById('prod-active').checked=true;
+  document.getElementById('prod-img-preview').style.display='none';
+  document.getElementById('prod-img-text').style.display='block';
+  document.getElementById('prod-img-url').value='';
+  document.getElementById('prod-result').textContent='';
+  document.getElementById('prodModal').classList.add('on');
+}
+function editProduct(id,name,price,stock,desc,img){
+  editProd=id;prodFile=null;
+  document.getElementById('prodModalTitle').textContent='Edit Product';
+  document.getElementById('prod-save-btn').textContent='Save Changes';
+  document.getElementById('prod-name').value=name;
+  document.getElementById('prod-price').value=price;
+  document.getElementById('prod-stock').value=stock;
+  document.getElementById('prod-desc').value=desc;
+  document.getElementById('prod-img-url').value=img;
+  if(img){const p=document.getElementById('prod-img-preview');p.src=img;p.style.display='block';document.getElementById('prod-img-text').style.display='none';}
+  else{document.getElementById('prod-img-preview').style.display='none';document.getElementById('prod-img-text').style.display='block';}
+  document.getElementById('prod-result').textContent='';
+  document.getElementById('prodModal').classList.add('on');
+}
+function onDrop(e){e.preventDefault();const f=e.dataTransfer.files[0];if(f)setFile(f);}
+function onFile(e){const f=e.target.files[0];if(f)setFile(f);}
+function setFile(f){
+  if(f.size>5*1024*1024){toast('Max 5MB','err');return;}
+  prodFile=f;
+  const r=new FileReader();
+  r.onload=e=>{const p=document.getElementById('prod-img-preview');p.src=e.target.result;p.style.display='block';document.getElementById('prod-img-text').style.display='none';};
+  r.readAsDataURL(f);
+}
+async function uploadImg(){
+  if(!prodFile)return document.getElementById('prod-img-url').value||'';
+  const form=new FormData();form.append('image',prodFile);form.append('slug',SLUG);
+  const r=await fetch(`/api/${SLUG}/upload-image?secret=${SECRET}`,{method:'POST',body:form});
+  const d=await r.json();
+  if(!r.ok){toast('Upload failed: '+(d.error||r.status),'err');return null;}
+  return d.url||null;
+}
+async function saveProduct(){
+  const name=document.getElementById('prod-name').value.trim();
+  const price=parseFloat(document.getElementById('prod-price').value);
+  if(!name||isNaN(price)){toast('Name and price required','err');return;}
+  const btn=document.getElementById('prod-save-btn');
+  btn.textContent='Saving...';btn.disabled=true;
+  try{
+    const imgUrl=await uploadImg();
+    const body={name,price,stock:parseInt(document.getElementById('prod-stock').value)||0,description:document.getElementById('prod-desc').value,active:document.getElementById('prod-active').checked,image_url:imgUrl||''};
+    const url=editProd?`/api/${SLUG}/products/${editProd}?secret=${SECRET}`:`/api/${SLUG}/products?secret=${SECRET}`;
+    const r=await fetch(url,{method:editProd?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const d=await r.json();
+    if(r.ok){toast('Saved! ✅');document.getElementById('prodModal').classList.remove('on');setTimeout(()=>location.reload(),600);}
+    else{toast(d.error||'Save failed','err');}
+  }catch(e){toast('Error: '+e.message,'err');}
+  finally{btn.textContent=editProd?'Save Changes':'Add Product';btn.disabled=false;}
+}
+async function deleteProduct(id,name){
+  if(!confirm(`Delete "${name}"?`))return;
+  const r=await fetch(`/api/${SLUG}/products/${id}?secret=${SECRET}`,{method:'DELETE'});
+  const d=await r.json();
+  toast(d.success?'Deleted':'Failed',d.success?'':'err');
+  if(d.success)setTimeout(()=>location.reload(),600);
+}
+
+function openAddFaq(){editFaq=null;document.getElementById('faqModalTitle').textContent='Add FAQ';document.getElementById('faq-q').value='';document.getElementById('faq-a').value='';document.getElementById('faq-result').textContent='';document.getElementById('faqModal').classList.add('on');}
+function editFaq(id,q,a){editFaq=id;document.getElementById('faqModalTitle').textContent='Edit FAQ';document.getElementById('faq-q').value=q;document.getElementById('faq-a').value=a;document.getElementById('faq-result').textContent='';document.getElementById('faqModal').classList.add('on');}
+async function saveFaq(){
+  const q=document.getElementById('faq-q').value.trim(),a=document.getElementById('faq-a').value.trim();
+  if(!q||!a){toast('Question and answer required','err');return;}
+  const url=editFaq?`/api/${SLUG}/faqs/${editFaq}?secret=${SECRET}`:`/api/${SLUG}/faqs?secret=${SECRET}`;
+  const r=await fetch(url,{method:editFaq?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q,answer:a})});
+  const d=await r.json();
+  if(r.ok){toast('Saved! ✅');document.getElementById('faqModal').classList.remove('on');setTimeout(()=>location.reload(),600);}
+  else toast(d.error||'Failed','err');
+}
+async function deleteFaq(id){
+  if(!confirm('Delete this FAQ?'))return;
+  const r=await fetch(`/api/${SLUG}/faqs/${id}?secret=${SECRET}`,{method:'DELETE'});
+  toast((await r.json()).success?'Deleted':'Failed',(await r.json()).success?'':'err');
+  setTimeout(()=>location.reload(),600);
+}
+
+async function sendBroadcast(){
+  const msg=document.getElementById('bcast-msg').value.trim();
+  const el=document.getElementById('bcast-result');
+  if(!msg){el.textContent='Write a message first.';return;}
+  el.textContent='Starting...';
+  const r=await fetch('/broadcast',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({secret:SECRET,slug:SLUG,message:msg})});
+  el.textContent=(await r.json()).message||'Started!';
+}
+
+function toast(msg,type){const el=document.getElementById('toast');el.textContent=msg;el.className='on'+(type==='err'?' err':'');clearTimeout(tt);tt=setTimeout(()=>el.className='',2800);}
+</script>
+</body>
+</html>
