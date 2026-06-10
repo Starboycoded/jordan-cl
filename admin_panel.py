@@ -23,6 +23,9 @@ ADMIN_SECRET = os.environ.get("ADMIN_SECRET", "CodedLabs2025")
 
 
 def _auth(req) -> bool:
+    from flask import session as flask_session
+    if flask_session.get("logged_in") and flask_session.get("is_admin"):
+        return True
     return (req.args.get("secret") == ADMIN_SECRET or
             req.headers.get("X-Admin-Secret") == ADMIN_SECRET)
 
@@ -33,8 +36,10 @@ def _auth(req) -> bool:
 
 @admin_panel.route("/codedlabs")
 def platform_dashboard():
-    if not _auth(request):
-        return "Unauthorized", 403
+    from flask import session as flask_session
+    if not _auth(request) and not (flask_session.get("logged_in") and flask_session.get("is_admin")):
+        from flask import redirect
+        return redirect("/login")
 
     clients  = db_layer.get_all_clients()
     secret   = ADMIN_SECRET
