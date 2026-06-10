@@ -537,3 +537,8 @@ def notify_human_handoff(phone: str, last_message: str, client: dict) -> bool:
         f"Please respond to them directly on WhatsApp."
     )
     return wa.send_text(merchant_phone, msg, client)
+
+
+# Public alias for use in other modules
+def notify_appointment_status_to_customer(ref: str, status: str, client: dict) -> None:
+    _notify_customer_appointment_status(ref, status, client)
