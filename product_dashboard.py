@@ -21,6 +21,10 @@ CATALOG_BASE = os.environ.get("CATALOG_BASE_URL", "https://bot-test-wddr.onrende
 
 
 def _auth(req) -> bool:
+    # Accept: URL param, header, or active Flask session
+    from flask import session as flask_session
+    if flask_session.get("logged_in"):
+        return True
     return (req.args.get("secret") == ADMIN_SECRET or
             req.headers.get("X-Admin-Secret") == ADMIN_SECRET)
 
@@ -30,6 +34,7 @@ def _auth(req) -> bool:
 # ─────────────────────────────────────────────────────
 
 @dashboard.route("/dashboard/<slug>")
+@dashboard.route("/admin/<slug>")
 def product_dashboard(slug: str):
     if not _auth(request):
         return _unauth()
@@ -38,18 +43,45 @@ def product_dashboard(slug: str):
     if not client:
         return "Store not found.", 404
 
+    from modules import get_enabled_modules
+    from subscriptions import get_plan
+
     t_cfg    = get_template(client.get("template", "general"))
-    cats     = t_cfg.get("categories", [])
     currency = client.get("currency", "NGN")
     secret   = ADMIN_SECRET
+    modules  = get_enabled_modules(client)
+    plan     = get_plan(client).get("name", "Starter")
+
+    # Load data for each enabled module
+    analytics    = db_layer.get_analytics(str(client["id"]))
+    products     = db_layer.get_products(str(client["id"])) if modules.get("commerce") else []
+    orders       = db_layer.get_orders(str(client["id"]), limit=100) if modules.get("commerce") else []
+    appointments = db_layer.get_appointments(str(client["id"]), limit=50) if modules.get("booking") else []
+    leads        = db_layer.get_leads(str(client["id"]), limit=100) if modules.get("leadgen") else []
+    faqs         = db_layer.get_faqs(str(client["id"])) if modules.get("support") else []
+
+    status_colors = {
+        "pending": "#f59e0b", "confirmed": "#3b82f6",
+        "awaiting_payment": "#a78bfa", "paid": "#06b6d4",
+        "processing": "#f97316", "delivered": "#22c55e", "cancelled": "#ef4444",
+    }
 
     return render_template("dashboard.html",
-        client     = client,
-        slug       = slug,
-        secret     = secret,
-        currency   = currency,
-        primary    = t_cfg.get("primary", "#25D366"),
-        categories = cats,
+        client        = client,
+        slug          = slug,
+        secret        = secret,
+        currency      = currency,
+        primary       = t_cfg.get("primary", "#25D366"),
+        modules       = modules,
+        plan          = plan,
+        products      = products,
+        orders        = orders,
+        appointments  = appointments,
+        leads         = leads,
+        faqs          = faqs,
+        stats         = analytics,
+        low_stock     = analytics.get("low_stock", []),
+        status_colors = status_colors,
     )
 
 
@@ -133,4 +165,110 @@ def api_update_client_settings(slug: str):
                "phone_number_id", "wa_token", "whatsapp_number", "merchant_phone", "ai_model", "active"}
     updates = {k: v for k, v in body.items() if k in allowed}
     ok      = db_layer.update_client(str(client["id"]), updates)
+    return jsonify({"success": ok})
+
+
+# ─────────────────────────────────────────────────────
+# APPOINTMENTS API
+# ─────────────────────────────────────────────────────
+
+@dashboard.route("/api/<slug>/appointments/<ref>/status", methods=["PUT"])
+def update_appointment_status(slug: str, ref: str):
+    if not _auth(request):
+        return jsonify({"error": "Unauthorized"}), 403
+    client = db_layer.get_client_by_slug(slug)
+    if not client:
+        return jsonify({"error": "Client not found"}), 404
+
+    body   = request.json or {}
+    status = body.get("status", "")
+    valid  = {"pending", "confirmed", "completed", "cancelled", "no_show"}
+    if status not in valid:
+        return jsonify({"error": f"Status must be one of: {valid}"}), 400
+
+    ok = db_layer.update_appointment_status(ref, str(client["id"]), status)
+    if ok:
+        from merchant import notify_appointment_status_to_customer
+        import threading
+        threading.Thread(
+            target=notify_appointment_status_to_customer,
+            args=(ref, status, client), daemon=True
+        ).start()
+    return jsonify({"success": ok})
+
+
+# ─────────────────────────────────────────────────────
+# LEADS API
+# ─────────────────────────────────────────────────────
+
+@dashboard.route("/api/<slug>/leads/<ref>/status", methods=["PUT"])
+def update_lead_status(slug: str, ref: str):
+    if not _auth(request):
+        return jsonify({"error": "Unauthorized"}), 403
+    client = db_layer.get_client_by_slug(slug)
+    if not client:
+        return jsonify({"error": "Client not found"}), 404
+
+    body   = request.json or {}
+    status = body.get("status", "")
+    valid  = {"new", "contacted", "qualified", "converted", "lost"}
+    if status not in valid:
+        return jsonify({"error": f"Status must be one of: {valid}"}), 400
+
+    ok = db_layer.update_lead_status(ref, str(client["id"]), status)
+    return jsonify({"success": ok})
+
+
+# ─────────────────────────────────────────────────────
+# FAQS API
+# ─────────────────────────────────────────────────────
+
+@dashboard.route("/api/<slug>/faqs", methods=["POST"])
+def create_faq(slug: str):
+    if not _auth(request):
+        return jsonify({"error": "Unauthorized"}), 403
+    client = db_layer.get_client_by_slug(slug)
+    if not client:
+        return jsonify({"error": "Client not found"}), 404
+
+    body = request.json or {}
+    if not body.get("question") or not body.get("answer"):
+        return jsonify({"error": "question and answer required"}), 400
+
+    faq = db_layer.create_faq(
+        client_id  = str(client["id"]),
+        question   = body["question"],
+        answer     = body["answer"],
+        sort_order = body.get("sort_order", 0)
+    )
+    return jsonify({"success": bool(faq), "faq": faq}), 201
+
+
+@dashboard.route("/api/<slug>/faqs/<int:faq_id>", methods=["PUT"])
+def update_faq(slug: str, faq_id: int):
+    if not _auth(request):
+        return jsonify({"error": "Unauthorized"}), 403
+    client = db_layer.get_client_by_slug(slug)
+    if not client:
+        return jsonify({"error": "Client not found"}), 404
+
+    body    = request.json or {}
+    allowed = {"question", "answer", "sort_order", "active"}
+    updates = {k: v for k, v in body.items() if k in allowed}
+    if not updates:
+        return jsonify({"error": "No valid fields"}), 400
+
+    ok = db_layer.update_faq(faq_id, str(client["id"]), updates)
+    return jsonify({"success": ok})
+
+
+@dashboard.route("/api/<slug>/faqs/<int:faq_id>", methods=["DELETE"])
+def delete_faq(slug: str, faq_id: int):
+    if not _auth(request):
+        return jsonify({"error": "Unauthorized"}), 403
+    client = db_layer.get_client_by_slug(slug)
+    if not client:
+        return jsonify({"error": "Client not found"}), 404
+
+    ok = db_layer.delete_faq(faq_id, str(client["id"]))
     return jsonify({"success": ok})
