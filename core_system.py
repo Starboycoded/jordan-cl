@@ -22,6 +22,7 @@ from modules import get_enabled_modules
 from onboarding import onboarding
 from product_dashboard import dashboard
 from admin_panel import admin_panel
+from auth import auth
 
 # ─────────────────────────────────────────────────────
 # CONFIG
@@ -39,6 +40,10 @@ app = Flask(__name__)
 app.register_blueprint(onboarding)
 app.register_blueprint(dashboard)
 app.register_blueprint(admin_panel)
+app.register_blueprint(auth)
+app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'jordan-codedlabs-2025-change-in-prod')
+from datetime import timedelta
+app.permanent_session_lifetime = timedelta(days=30)
 
 # In-memory session cache (backed by Supabase for persistence)
 _session_cache: dict = {}   # key: f"{client_id}:{phone}"
@@ -904,57 +909,9 @@ def storefront(slug: str):
 # ADMIN DASHBOARD
 # ─────────────────────────────────────────────────────
 
-@app.route("/admin/<slug>")
-def admin_dashboard(slug: str):
-    """Legacy admin route — renders the same unified dashboard."""
-    return product_dashboard(slug)
-
-
-@app.route("/dashboard/<slug>")
-def product_dashboard(slug: str):
-    """Unified modular dashboard — sections depend on enabled modules."""
-    if request.args.get("secret") != ADMIN_SECRET:
-        return "Unauthorized. Add ?secret=YOUR_SECRET to the URL.", 403
-    client = db_layer.get_client_by_slug(slug)
-    if not client:
-        return "Client not found.", 404
-
-    client_id    = str(client["id"])
-    modules      = get_enabled_modules(client)
-    analytics    = db_layer.get_analytics(client_id)
-    t_cfg        = get_template(client.get("template", "general"))
-    currency     = client.get("currency", "NGN")
-
-    orders       = db_layer.get_orders(client_id, limit=100) if modules.get("commerce") else []
-    products     = db_layer.get_products(client_id)          if modules.get("commerce") else []
-    appointments = db_layer.get_appointments(client_id)      if modules.get("booking")  else []
-    leads        = db_layer.get_leads(client_id)             if modules.get("leadgen")  else []
-    faqs         = db_layer.get_faqs(client_id)              if modules.get("support")  else []
-
-    status_colors = {
-        "pending": "#f59e0b", "confirmed": "#3b82f6",
-        "awaiting_payment": "#a78bfa", "paid": "#06b6d4",
-        "processing": "#f97316", "delivered": "#22c55e", "cancelled": "#ef4444",
-    }
-
-    return render_template("dashboard.html",
-        client        = client,
-        slug          = slug,
-        secret        = request.args.get("secret", ""),
-        modules       = modules,
-        currency      = currency,
-        primary       = t_cfg.get("primary", "#25D366"),
-        plan          = client.get("plan", "starter"),
-        stats         = analytics,
-        low_stock     = analytics.get("low_stock", []),
-        products      = products,
-        orders        = orders,
-        appointments  = appointments,
-        leads         = leads,
-        faqs          = faqs,
-        status_colors = status_colors,
-        catalog_url   = f"{CATALOG_BASE}/{slug}",
-    )
+# Dashboard and admin routes are handled by product_dashboard Blueprint.
+# /dashboard/<slug>  →  product_dashboard.py
+# /admin/<slug>      →  product_dashboard.py (alias)
 
 
 
@@ -962,25 +919,7 @@ def product_dashboard(slug: str):
 # APPOINTMENT API
 # ─────────────────────────────────────────────────────
 
-@app.route("/api/<slug>/appointments/<ref>/status", methods=["PUT"])
-def api_update_appointment(slug: str, ref: str):
-    if not _require_admin(request):
-        return jsonify({"error": "Unauthorized"}), 403
-    client = db_layer.get_client_by_slug(slug)
-    if not client:
-        return jsonify({"error": "Client not found"}), 404
-    body   = request.json or {}
-    status = body.get("status", "")
-    valid  = {"pending", "confirmed", "completed", "cancelled", "no_show"}
-    if status not in valid:
-        return jsonify({"error": f"Status must be one of: {valid}"}), 400
-    ok = db_layer.update_appointment_status(ref, str(client["id"]), status)
-    if ok:
-        from merchant import _notify_customer_appointment_status
-        import threading
-        threading.Thread(target=_notify_customer_appointment_status,
-            args=(ref, status, client), daemon=True).start()
-    return jsonify({"success": ok})
+# Appointment status API is in product_dashboard Blueprint
 
 
 # ─────────────────────────────────────────────────────
