@@ -60,6 +60,9 @@ def product_dashboard(slug: str):
     leads        = db_layer.get_leads(str(client["id"]), limit=100) if modules.get("leadgen") else []
     faqs         = db_layer.get_faqs(str(client["id"])) if modules.get("support") else []
 
+    # Message inbox (v5.6)
+    conversations = db_layer.get_conversation_list(str(client["id"]))
+
     status_colors = {
         "pending": "#f59e0b", "confirmed": "#3b82f6",
         "awaiting_payment": "#a78bfa", "paid": "#06b6d4",
@@ -81,6 +84,7 @@ def product_dashboard(slug: str):
         faqs          = faqs,
         stats         = analytics,
         low_stock     = analytics.get("low_stock", []),
+        conversations = conversations,
         status_colors = status_colors,
     )
 
