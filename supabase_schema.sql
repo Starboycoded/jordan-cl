@@ -66,3 +66,28 @@ CREATE TABLE orders (
     total       NUMERIC(12,2) NOT NULL,
     address     TEXT,
     status      TEXT DEFAULT 'pending',            -- pending | confirmed | awaiting_payment | paid | processing | delivered | cancelled
+
+    -- ══════════════════════════════════════════════════════
+    -- MESSAGE INBOX (v5.6)
+    -- ══════════════════════════════════════════════════════
+
+    CREATE TABLE IF NOT EXISTS messages (
+        id          BIGSERIAL PRIMARY KEY,
+        client_id   UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+        phone       TEXT NOT NULL,
+        direction   TEXT NOT NULL DEFAULT 'incoming',
+        message     TEXT NOT NULL,
+        message_id  TEXT,
+        sender_type TEXT DEFAULT 'customer',
+        created_at  TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_messages_client_phone
+        ON messages(client_id, phone, created_at);
+
+    CREATE INDEX IF NOT EXISTS idx_messages_client
+        ON messages(client_id, created_at DESC);
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_dedup
+        ON messages(client_id, message_id) WHERE message_id IS NOT NULL;
+    
