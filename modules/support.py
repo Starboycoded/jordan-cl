@@ -78,13 +78,21 @@ def handle(phone: str, message: str, button_id: str,
         wa.send_text(phone, "✅ You're back with Jordan! How can I help?", client)
         return True
 
-    # ── HUMAN MODE ACTIVE ────────────────────────────
+    # ── HUMAN MODE ACTIVE (v5.6 — relay to merchant) ──
     if session.get("human_mode"):
-        wa.send_text(phone,
-            "⚠️ You're connected with our team. They'll respond shortly.\n"
-            "_Type *RESUME BOT* to return to Jordan._", client)
+        merchant_phone = (client.get("merchant_phone") or "").strip()
+        if merchant_phone:
+            wa.send_text(merchant_phone,
+                f"📩 *Customer +{phone}:* {message}\n\n"
+                "_Reply here to respond. Type RESUME to end._", client)
+            wa.send_text(phone,
+                "✅ Message sent to the team. They'll respond shortly.\n"
+                "_Type *RESUME BOT* to return to Jordan._", client)
+        else:
+            wa.send_text(phone,
+                "⚠️ You're connected with our team. They'll respond shortly.\n"
+                "_Type *RESUME BOT* to return to Jordan._", client)
         return True
-
     # ── HUMAN HANDOFF REQUEST ────────────────────────
     if msg in HUMAN_TRIGGERS or any(t in msg for t in HUMAN_TRIGGERS):
         session["human_mode"] = True
