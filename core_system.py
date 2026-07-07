@@ -45,6 +45,35 @@ app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'jordan-codedlabs-2025-chang
 from datetime import timedelta
 app.permanent_session_lifetime = timedelta(days=30)
 
+# ══════════════════════════════════════════════════════
+# MESSAGE LOGGING WRAPPER (v5.6)
+# ══════════════════════════════════════════════════════
+
+_original_send_text    = wa.send_text
+_original_send_buttons = wa.send_buttons
+
+def _logged_send_text(phone, text, client, msg_id=None):
+    try:
+        result = _original_send_text(phone, text, client)
+        if client and isinstance(client, dict) and client.get("id"):
+            sender = "merchant" if merch.is_merchant(phone, client) else "jordan"
+            db_layer.log_message(str(client["id"]), phone, "outgoing", text, msg_id, sender)
+        return result
+    except Exception:
+        return _original_send_text(phone, text, client)
+
+def _logged_send_buttons(phone, text, buttons, client):
+    try:
+        result = _original_send_buttons(phone, text, buttons, client)
+        if client and isinstance(client, dict) and client.get("id"):
+            db_layer.log_message(str(client["id"]), phone, "outgoing", text, None, "jordan")
+        return result
+    except Exception:
+        return _original_send_buttons(phone, text, buttons, client)
+
+wa.send_text    = _logged_send_text
+wa.send_buttons = _logged_send_buttons
+
 # In-memory session cache (backed by Supabase for persistence)
 _session_cache: dict = {}   # key: f"{client_id}:{phone}"
 _product_cache: dict = {}   # key: client_id  →  {"data": [...], "ts": float}
@@ -145,8 +174,39 @@ def process_message(phone: str, message: str, message_id: str, client: dict, but
     prod_map  = _products_map(products)
     customer  = db_layer.get_or_create_customer(client_id, phone)
 
+    # Log incoming message to inbox (v5.6)
+    db_layer.log_message(client_id, phone, "incoming", message, message_id, "customer")
+
     # Mark as read
     wa.mark_read(message_id, client)
+
+
+    # ── HUMAN HANDOFF RELAY (v5.6) ──
+    # When merchant messages while a customer has human_mode active,
+    # relay it to the customer instead of treating as a merchant command.
+    if merch.is_merchant(phone, client):
+        human_session = db_layer.get_human_mode_session(client_id)
+        if human_session:
+            msg_upper = message.strip().upper()
+            # Merchant ending the handoff
+            if msg_upper in ("RESUME", "RESUME BOT", "/RESUME", "/END", "END HANDOFF"):
+                cust_phone = human_session["phone"]
+                db_layer.end_human_mode(client_id, cust_phone)
+                wa.send_text(cust_phone,
+                    "✅ The team has ended the handoff. Jordan is back! How can I help?", client)
+                wa.send_text(phone, f"✅ Handoff ended. Customer +{cust_phone} is back with Jordan.", client)
+                return
+            # Known merchant commands — let them through
+            known_prefixes = ("TODAY", "ORDERS", "LOW STOCK", "CUSTOMERS", "COMMANDS",
+                            "STATS", "SUMMARY", "PRODUCTS", "SETTINGS", "HELP",
+                            "CONFIRM ", "DELIVERED ", "CANCEL ", "PAID ", "PROCESSING ")
+            is_cmd = msg_upper in ("HI", "HELLO", "START") or any(msg_upper.startswith(p) for p in known_prefixes)
+            if not is_cmd and not button_id:
+                # Relay to customer
+                cust_phone = human_session["phone"]
+                wa.send_text(cust_phone, f"💬 *{biz_name} team:* {message}", client)
+                wa.send_text(phone, f"✅ Relayed to +{cust_phone}", client)
+                return
 
     # ── MERCHANT COMMANDS (check before customer flow) ──
     if merch.is_merchant(phone, client):
@@ -613,6 +673,50 @@ def health():
 # ENTRY POINT
 # ─────────────────────────────────────────────────────
 
+
+# ══════════════════════════════════════════════════════
+# MESSAGE INBOX API (v5.6)
+# ══════════════════════════════════════════════════════
+
+@app.route("/api/<slug>/conversations")
+def api_conversations(slug: str):
+    """List all unique customer conversations for this client."""
+    secret = request.args.get("secret", "") or request.headers.get("X-Admin-Secret", "")
+    if secret != ADMIN_SECRET:
+        from flask import session as flask_session
+        if not flask_session.get("logged_in"):
+            return jsonify({"error": "Unauthorized"}), 403
+
+    client = db_layer.get_client_by_slug(slug)
+    if not client:
+        return jsonify({"error": "Client not found"}), 404
+
+    conversations = db_layer.get_conversation_list(str(client["id"]))
+    return jsonify({"conversations": conversations})
+
+
+@app.route("/api/<slug>/messages")
+def api_messages(slug: str):
+    """Get message history, optionally filtered by phone."""
+    secret = request.args.get("secret", "") or request.headers.get("X-Admin-Secret", "")
+    if secret != ADMIN_SECRET:
+        from flask import session as flask_session
+        if not flask_session.get("logged_in"):
+            return jsonify({"error": "Unauthorized"}), 403
+
+    client = db_layer.get_client_by_slug(slug)
+    if not client:
+        return jsonify({"error": "Client not found"}), 404
+
+    phone = request.args.get("phone", "")
+    limit = int(request.args.get("limit", 100))
+
+    messages = db_layer.get_messages(
+        str(client["id"]),
+        phone=phone if phone else None,
+        limit=min(limit, 500)
+    )
+    return jsonify({"messages": messages, "phone": phone or None})
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port, debug=False)
