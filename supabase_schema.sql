@@ -3,6 +3,7 @@
 -- Run this in your Supabase SQL editor
 -- ══════════════════════════════════════════════════════
 
+
 -- CLIENTS (one row per business)
 CREATE TABLE clients (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -17,8 +18,12 @@ CREATE TABLE clients (
     currency        TEXT DEFAULT 'NGN',
     ai_model        TEXT DEFAULT 'claude-haiku-4-5',  -- haiku (default) | claude-sonnet-4-6 (premium)
     active          BOOLEAN DEFAULT TRUE,
+    welcome_msg     TEXT,                            -- Custom welcome message
+    bank_details    TEXT,                            -- Payment/bank info for invoices
+    biz_hours       TEXT,                            -- Business hours for support
     created_at      TIMESTAMPTZ DEFAULT NOW()
 );
+
 
 -- PRODUCTS (per client)
 CREATE TABLE products (
@@ -34,6 +39,7 @@ CREATE TABLE products (
     created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
+
 -- CUSTOMERS (per client)
 CREATE TABLE customers (
     id          BIGSERIAL PRIMARY KEY,
@@ -48,6 +54,7 @@ CREATE TABLE customers (
     UNIQUE(client_id, phone)
 );
 
+
 -- ORDERS
 CREATE TABLE orders (
     id          BIGSERIAL PRIMARY KEY,
@@ -59,143 +66,3 @@ CREATE TABLE orders (
     total       NUMERIC(12,2) NOT NULL,
     address     TEXT,
     status      TEXT DEFAULT 'pending',            -- pending | confirmed | awaiting_payment | paid | processing | delivered | cancelled
-    notes       TEXT,
-    created_at  TIMESTAMPTZ DEFAULT NOW(),
-    updated_at  TIMESTAMPTZ DEFAULT NOW()
-);
-
--- SESSIONS (conversation state, in-memory + DB fallback)
-CREATE TABLE sessions (
-    id          BIGSERIAL PRIMARY KEY,
-    client_id   UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
-    phone       TEXT NOT NULL,
-    state       TEXT DEFAULT 'idle',
-    cart        JSONB DEFAULT '{}',
-    context     JSONB DEFAULT '[]',               -- last N messages for AI context
-    human_mode  BOOLEAN DEFAULT FALSE,
-    updated_at  TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE(client_id, phone)
-);
-
--- BROADCASTS
-CREATE TABLE broadcasts (
-    id          BIGSERIAL PRIMARY KEY,
-    client_id   UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
-    message     TEXT NOT NULL,
-    sent_count  INTEGER DEFAULT 0,
-    fail_count  INTEGER DEFAULT 0,
-    status      TEXT DEFAULT 'pending',           -- pending | running | done | failed
-    created_at  TIMESTAMPTZ DEFAULT NOW(),
-    finished_at TIMESTAMPTZ
-);
-
--- TOKEN USAGE
-CREATE TABLE token_log (
-    id          BIGSERIAL PRIMARY KEY,
-    client_id   UUID REFERENCES clients(id) ON DELETE SET NULL,
-    date        DATE DEFAULT CURRENT_DATE,
-    tokens      INTEGER DEFAULT 0,
-    UNIQUE(client_id, date)
-);
-
--- INDEXES
-CREATE INDEX idx_products_client    ON products(client_id) WHERE active = TRUE;
-CREATE INDEX idx_customers_client   ON customers(client_id);
-CREATE INDEX idx_customers_phone    ON customers(phone);
-CREATE INDEX idx_orders_client      ON orders(client_id);
-CREATE INDEX idx_orders_status      ON orders(status);
-CREATE INDEX idx_sessions_lookup    ON sessions(client_id, phone);
-
--- ROW LEVEL SECURITY (enable later when adding auth)
--- ALTER TABLE clients ENABLE ROW LEVEL SECURITY;
--- ALTER TABLE products ENABLE ROW LEVEL SECURITY;
--- ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
-
--- ══════════════════════════════════════════════════════
--- SEED: Insert TechSquad as first client
--- Update slug, name, phone_number_id, wa_token as needed
--- ══════════════════════════════════════════════════════
-INSERT INTO clients (slug, business_name, phone_number_id, template, currency)
-VALUES ('tech_squad', 'The Tech Squad', '989005180973554', 'electronics', 'NGN');
-
-
--- ══════════════════════════════════════════════════════
--- v5.3 ADDITIONS — Run these after the original schema
--- ══════════════════════════════════════════════════════
-
--- APPOINTMENTS (Booking template)
-CREATE TABLE IF NOT EXISTS appointments (
-    id           BIGSERIAL PRIMARY KEY,
-    client_id    UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
-    ref          TEXT NOT NULL,
-    phone        TEXT NOT NULL,
-    customer_id  BIGINT REFERENCES customers(id),
-    service_name TEXT NOT NULL,
-    service_id   TEXT,
-    price        NUMERIC(12,2) DEFAULT 0,
-    date         TEXT NOT NULL,
-    time         TEXT NOT NULL,
-    notes        TEXT,
-    status       TEXT DEFAULT 'pending',   -- pending | confirmed | completed | cancelled | no_show
-    created_at   TIMESTAMPTZ DEFAULT NOW(),
-    updated_at   TIMESTAMPTZ DEFAULT NOW()
-);
-
--- LEADS (Lead Gen template)
-CREATE TABLE IF NOT EXISTS leads (
-    id           BIGSERIAL PRIMARY KEY,
-    client_id    UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
-    ref          TEXT NOT NULL,
-    phone        TEXT NOT NULL,
-    customer_id  BIGINT REFERENCES customers(id),
-    name         TEXT,
-    location     TEXT,
-    budget       TEXT,
-    timeline     TEXT,
-    interest     TEXT,
-    data         JSONB DEFAULT '{}',       -- full lead data dict
-    status       TEXT DEFAULT 'new',       -- new | contacted | qualified | converted | lost
-    notes        TEXT,
-    created_at   TIMESTAMPTZ DEFAULT NOW(),
-    updated_at   TIMESTAMPTZ DEFAULT NOW()
-);
-
--- FAQS (Support template)
-CREATE TABLE IF NOT EXISTS faqs (
-    id           BIGSERIAL PRIMARY KEY,
-    client_id    UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
-    question     TEXT NOT NULL,
-    answer       TEXT NOT NULL,
-    sort_order   INTEGER DEFAULT 0,
-    active       BOOLEAN DEFAULT TRUE,
-    created_at   TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Add extra columns to clients table for support template
-ALTER TABLE clients ADD COLUMN IF NOT EXISTS business_hours TEXT;
-ALTER TABLE clients ADD COLUMN IF NOT EXISTS contact_info   TEXT;
-
--- Indexes
-CREATE INDEX IF NOT EXISTS idx_appointments_client ON appointments(client_id);
-CREATE INDEX IF NOT EXISTS idx_appointments_phone  ON appointments(phone);
-CREATE INDEX IF NOT EXISTS idx_appointments_date   ON appointments(date);
-CREATE INDEX IF NOT EXISTS idx_leads_client        ON leads(client_id);
-CREATE INDEX IF NOT EXISTS idx_leads_status        ON leads(status);
-CREATE INDEX IF NOT EXISTS idx_faqs_client         ON faqs(client_id) WHERE active = TRUE;
-
-
--- ══════════════════════════════════════════════════════
--- v5.3 SUBSCRIPTION & ADMIN COLUMNS
--- Run after previous migrations
--- ══════════════════════════════════════════════════════
-
--- Add subscription plan fields to clients
-ALTER TABLE clients ADD COLUMN IF NOT EXISTS plan             TEXT DEFAULT 'starter';
-ALTER TABLE clients ADD COLUMN IF NOT EXISTS plan_expires_at  TIMESTAMPTZ;
-ALTER TABLE clients ADD COLUMN IF NOT EXISTS feature_flags    JSONB DEFAULT '{}';
-
--- Add notes to customers for issue tracking
-ALTER TABLE customers ADD COLUMN IF NOT EXISTS notes TEXT;
-
--- Index for plan lookups
-CREATE INDEX IF NOT EXISTS idx_clients_plan ON clients(plan);
