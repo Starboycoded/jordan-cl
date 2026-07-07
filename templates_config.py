@@ -201,7 +201,119 @@ Be friendly, clear and concise. No jargon. No corporate speak.""",
         "greeting": "Hi! 💬 How can I help you today? Ask me anything!",
     },
 
-    # ── GENERAL fallback ──────────────────────────
+
+        # ── SALON sub-type (booking variant) ──────────
+        "salon": {
+            "name":        "Salon & Spa",
+            "emoji":       "💇",
+            "description": "Hair, nails, facials, massage",
+            "tagline":     "Book your beauty appointment",
+            "flow":        "booking",
+            "primary":     "#EC4899",
+            "bg":          "#0d0008",
+            "card_bg":     "#150010",
+            "border":      "#2a001a",
+            "categories":  ["Hair", "Nails", "Facial", "Massage", "Makeup", "Other"],
+            "checkout_extras": [],
+            "dashboard_tabs": ["services", "appointments", "customers", "availability"],
+            "ai_persona": """You are Jordan, a friendly salon booking assistant on WhatsApp.
+    Help customers book hair, nail, facial and massage appointments smoothly.
+    Ask about preferred stylist and any special requirements.
+    Be warm, professional and excited about helping them look their best.""",
+            "greeting": "Hi! 💇 Welcome to our salon. What service would you like to book today?",
+            "booking_config": {
+                "time_slots":      ["9:00 AM", "10:00 AM", "11:00 AM", "12:00 PM",
+                                    "1:00 PM", "2:00 PM", "3:00 PM", "4:00 PM", "5:00 PM"],
+                "days_ahead":      14,
+                "slot_duration":   60,
+                "advance_notice":  2,
+            },
+        },
+
+        # ── CLINIC sub-type (booking variant) ──────────
+        "clinic": {
+            "name":        "Clinic & Healthcare",
+            "emoji":       "🏥",
+            "description": "Doctor consultations, dental, physio, lab tests",
+            "tagline":     "Book your medical appointment",
+            "flow":        "booking",
+            "primary":     "#14B8A6",
+            "bg":          "#000d0d",
+            "card_bg":     "#001515",
+            "border":      "#002a2a",
+            "categories":  ["Consultation", "Check-up", "Dental", "Lab Test", "Physio", "Other"],
+            "checkout_extras": [],
+            "dashboard_tabs": ["services", "appointments", "customers", "availability"],
+            "ai_persona": """You are Jordan, a professional clinic booking assistant on WhatsApp.
+    Help patients book medical appointments efficiently and accurately.
+    Ask about symptoms or reason for visit when relevant.
+    Be professional, caring and respect patient privacy. Never give medical advice.""",
+            "greeting": "Hi! 🏥 Welcome to our clinic. How can I help you book an appointment?",
+            "booking_config": {
+                "time_slots":      ["8:00 AM", "9:00 AM", "10:00 AM", "11:00 AM",
+                                    "12:00 PM", "1:00 PM", "2:00 PM", "3:00 PM", "4:00 PM"],
+                "days_ahead":      30,
+                "slot_duration":   30,
+                "advance_notice":  4,
+            },
+        },
+
+        # ── REAL ESTATE sub-type (leadgen variant) ─────
+        "real_estate": {
+            "name":        "Real Estate",
+            "emoji":       "🏠",
+            "description": "Property sales, rentals, shortlets, land",
+            "tagline":     "Find your dream property",
+            "flow":        "lead_gen",
+            "primary":     "#F59E0B",
+            "bg":          "#0d0900",
+            "card_bg":     "#150f00",
+            "border":      "#2a1e00",
+            "categories":  [],
+            "checkout_extras": [],
+            "dashboard_tabs": ["leads", "pipeline", "customers", "broadcast"],
+            "ai_persona": """You are Jordan, a knowledgeable real estate assistant on WhatsApp.
+    Help potential buyers and renters find properties that match their needs.
+    Qualify leads by understanding budget, preferred location, property type, and timeline.
+    Be honest about what's available — never overpromise. Build trust through expertise.""",
+            "greeting": "Hi! 🏠 Looking for a property? Tell me what you're looking for — buy or rent, location, budget — and I'll help you find the perfect match.",
+            "lead_fields": [
+                {"key": "name",      "question": "Great! First, what's your full name?"},
+                {"key": "location",  "question": "Which area(s) are you interested in?"},
+                {"key": "property_type", "question": "What type of property — flat, house, land, commercial?"},
+                {"key": "budget",    "question": "What's your budget range?"},
+                {"key": "timeline",  "question": "When are you looking to move or close?"},
+            ],
+        },
+
+        # ── AGENCY sub-type (leadgen variant) ──────────
+        "agency": {
+            "name":        "Digital Agency",
+            "emoji":       "🚀",
+            "description": "Web design, marketing, branding, SEO",
+            "tagline":     "Grow your business online",
+            "flow":        "lead_gen",
+            "primary":     "#8B5CF6",
+            "bg":          "#08000f",
+            "card_bg":     "#10001a",
+            "border":      "#1e0030",
+            "categories":  [],
+            "checkout_extras": [],
+            "dashboard_tabs": ["leads", "pipeline", "customers", "broadcast"],
+            "ai_persona": """You are Jordan, a savvy digital agency assistant on WhatsApp.
+    Help potential clients understand what services they need — web design, SEO, branding, social media.
+    Qualify leads naturally by asking about their business, current online presence, and goals.
+    Be consultative, not salesy. Position yourself as a trusted advisor.""",
+            "greeting": "Hi! 🚀 Looking to grow your business online? Tell me about what you do and what you're trying to achieve — I'd love to help.",
+            "lead_fields": [
+                {"key": "name",      "question": "First, what's your name and company?"},
+                {"key": "service",   "question": "What service are you most interested in — web design, marketing, SEO, branding, or something else?"},
+                {"key": "budget",    "question": "Do you have a budget range in mind for this project?"},
+                {"key": "timeline",  "question": "When are you hoping to get started?"},
+            ],
+        },
+
+        # ── GENERAL fallback ──────────────────────────
     "general": {
         "name":        "General Business",
         "emoji":       "🏢",
