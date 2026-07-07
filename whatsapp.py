@@ -1,9 +1,9 @@
-# ══════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════
 # JORDAN v5 — WHATSAPP META CLOUD API HANDLER
-# ══════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════
 
 import os
-import hmac
+import hmac as _hmac
 import hashlib
 import logging
 import requests
@@ -224,22 +224,6 @@ def parse_webhook(data: dict) -> Optional[dict]:
         return None
 
 
-def verify_signature(payload: bytes, signature: str) -> bool:
-    """Verify Meta webhook signature (X-Hub-Signature-256)."""
-    if not APP_SECRET:
-        return True  # Skip if not configured (dev mode)
-    try:
-        expected = "sha256=" + hmac.new(
-            APP_SECRET.encode(), payload, hashlib.sha256
-        ).hexdigest()
-        return hmac.compare_digest(expected, signature)
-    except Exception as e:
-        logger.error(f"[WA] verify_signature: {e}")
-        return False
-
-
-# Fix: hmac.new should be hmac.new
-import hmac as _hmac
 def verify_signature(payload: bytes, signature: str) -> bool:
     if not APP_SECRET:
         return True
