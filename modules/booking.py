@@ -123,6 +123,11 @@ def handle(phone: str, message: str, button_id: str,
         _handle_typed_date(phone, message, client, session)
         return
 
+    # Awaiting time selection (typed or numbered)
+    if session.get("state") == "awaiting_time":
+        _handle_typed_time(phone, message, client, session)
+        return
+
     # Awaiting notes
     if session.get("state") == "awaiting_notes":
         session["booking"]["notes"] = message.strip()
@@ -274,6 +279,7 @@ def _select_date(phone, chosen_date, client, session):
     available = avail.get_available_slots(client_id, chosen_date, all_day_slots)
 
     session["booking"]["date"] = chosen_date
+    session["booking"]["_available_slots"] = available  # for numbered selection
     session["state"]           = "awaiting_time"
     _save(client_id, phone, session)
 
@@ -350,6 +356,73 @@ def _select_time(phone, time_label, client, session, customer):
         f"Any notes for us? (or tap Confirm)",
         [{"id": "bk_confirm", "title": "✅ Confirm Booking"},
          {"id": "bk_cancel",  "title": "❌ Cancel"}], client)
+
+
+def _handle_typed_time(phone, message, client, session):
+    """Handle typed time or numbered selection from the time list."""
+    client_id = str(client["id"])
+    bc        = _get_booking_config(client)
+    msg       = message.strip()
+    available = session.get("booking", {}).get("_available_slots", [])
+    
+    # Try numbered selection first (e.g., user types "3" for item #3)
+    try:
+        num = int(msg)
+        if 1 <= num <= len(available):
+            time_label = available[num - 1]
+            _select_time(phone, time_label, client, session, {"name": ""})
+            return
+        else:
+            wa.send_text(phone,
+                f"Please pick a number between 1 and {len(available)}.\\n\\n"
+                f"Or type a time like *10:00 AM*.", client)
+            return
+    except ValueError:
+        pass  # not a number, try as time string
+    
+    # Try parsing as a time string (e.g., "10:00 AM", "2pm", "14:00")
+    try:
+        from dateutil import parser as dp
+        import re
+        # Clean up common formats
+        clean = msg.upper().replace(" ", "").replace(".", ":")
+        # Try to parse
+        parsed = dp.parse(msg)
+        hour = parsed.hour
+        minute = parsed.minute
+        # Format consistently
+        if hour == 0:
+            formatted = f"12:{minute:02d} AM"
+        elif hour < 12:
+            formatted = f"{hour}:{minute:02d} AM"
+        elif hour == 12:
+            formatted = f"12:{minute:02d} PM"
+        else:
+            formatted = f"{hour-12}:{minute:02d} PM"
+        
+        # Check if this time is in the available slots (fuzzy match)
+        if available:
+            # Try exact match first
+            if formatted in available:
+                _select_time(phone, formatted, client, session, {"name": ""})
+                return
+            # Try the raw message as-is
+            if msg.upper() in [s.upper() for s in available]:
+                _select_time(phone, msg.upper(), client, session, {"name": ""})
+                return
+        
+        # If we got here, the time was parsed but not in available slots
+        _select_time(phone, formatted, client, session, {"name": ""})
+        return
+    except Exception:
+        pass
+    
+    # Can't parse — show help
+    if available:
+        text = "I didn't catch that time. \\n\\nPlease type a time like *10:00 AM* or pick a number from the list."
+    else:
+        text = "I didn't catch that time. Try something like *10:00 AM* or *2pm*."
+    wa.send_text(phone, text, client)
 
 
 def _show_booking_summary(phone, client, session):
