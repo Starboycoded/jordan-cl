@@ -301,12 +301,21 @@ def _select_date(phone, chosen_date, client, session):
         wa.send_buttons(phone,
             f"📅 *{label}* — {len(available)} slot(s) available\n\nChoose a time:",
             buttons, client)
-    else:
+    elif len(available) <= 10:
         rows = [{"id": f"time_{s.replace(' ','_')}", "title": s, "description": "Available"} for s in available]
         wa.send_list(phone,
             f"📅 *{label}* — {len(available)} available\n\nChoose your preferred time:",
             "Pick a Time",
             [{"title": "Available Times", "rows": rows}], client)
+    else:
+        # More than 10 slots — WhatsApp lists cap at 10 rows, use text instead
+        text = f"📅 *{label}* — {len(available)} available\n\n"
+        for i, s in enumerate(available[:15], 1):
+            text += f"{i}. {s}\n"
+        if len(available) > 15:
+            text += f"\n_...and {len(available)-15} more_\n"
+        text += "\nReply with your preferred time (e.g. *10:00 AM*)."
+        wa.send_text(phone, text, client)
 
 
 def _select_time(phone, time_label, client, session, customer):
