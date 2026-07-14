@@ -508,110 +508,109 @@ def update_faq(faq_id: int, client_id: str, updates: dict) -> bool:
 def delete_faq(faq_id: int, client_id: str) -> bool:
     return update_faq(faq_id, client_id, {"active": False})
 
-    # ─────────────────────────────────────────────────────
-    # MESSAGE INBOX (v5.6)
-    # ─────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────
+# MESSAGE INBOX (v5.6)
+# ─────────────────────────────────────────────────────
 
-    def log_message(client_id: str, phone: str, direction: str, 
-                    message: str, message_id: str = None,
-                    sender_type: str = "customer") -> bool:
-        """Log a WhatsApp message to the inbox."""
-        try:
-            record = {
-                "client_id":   client_id,
-                "phone":       phone,
-                "direction":   direction,
-                "message":     message[:4000],  # safety cap
-                "sender_type": sender_type,
-            }
-            if message_id:
-                record["message_id"] = message_id
+def log_message(client_id: str, phone: str, direction: str, 
+                message: str, message_id: str = None,
+                sender_type: str = "customer") -> bool:
+    """Log a WhatsApp message to the inbox."""
+    try:
+        record = {
+            "client_id":   client_id,
+            "phone":       phone,
+            "direction":   direction,
+            "message":     message[:4000],  # safety cap
+            "sender_type": sender_type,
+        }
+        if message_id:
+            record["message_id"] = message_id
 
-            db().table("messages").upsert(
-                record,
-                on_conflict="client_id,message_id"
-            ).execute()
-            return True
-        except Exception as e:
-            # Don't fail the whole flow over a log failure
-            logger.warning(f"[DB] log_message: {e}")
-            return False
+        db().table("messages").upsert(
+            record,
+            on_conflict="client_id,message_id"
+        ).execute()
+        return True
+    except Exception as e:
+        # Don't fail the whole flow over a log failure
+        logger.warning(f"[DB] log_message: {e}")
+        return False
 
 
-    def get_messages(client_id: str, phone: str = None, 
-                     limit: int = 100) -> list:
-        """Get message history. If phone is provided, get that conversation."""
-        try:
-            q = db().table("messages").select("*")\
-                .eq("client_id", client_id)\
-                .order("created_at", desc=False)\
-                .limit(limit)
-            if phone:
-                q = q.eq("phone", phone)
-            return q.execute().data or []
-        except Exception as e:
-            logger.error(f"[DB] get_messages: {e}")
+def get_messages(client_id: str, phone: str = None, 
+                 limit: int = 100) -> list:
+    """Get message history. If phone is provided, get that conversation."""
+    try:
+        q = db().table("messages").select("*")\
+            .eq("client_id", client_id)\
+            .order("created_at", desc=False)\
+            .limit(limit)
+        if phone:
+            q = q.eq("phone", phone)
+        return q.execute().data or []
+    except Exception as e:
+        logger.error(f"[DB] get_messages: {e}")
+        return []
+
+
+def get_conversation_list(client_id: str) -> list:
+    """Get list of unique phone numbers with latest message preview."""
+    try:
+        # Get all messages, group by phone in Python
+        r = db().table("messages").select("phone, message, direction, sender_type, created_at")\
+            .eq("client_id", client_id)\
+            .order("created_at", desc=True)\
+            .limit(500)\
+            .execute()
+
+        if not r.data:
             return []
 
+        # Group latest per phone
+        seen = {}
+        for msg in r.data:
+            phone = msg["phone"]
+            if phone not in seen:
+                seen[phone] = {
+                    "phone": phone,
+                    "last_message": msg["message"][:100],
+                    "last_direction": msg["direction"],
+                    "last_sender": msg["sender_type"],
+                    "last_at": msg["created_at"],
+                }
 
-    def get_conversation_list(client_id: str) -> list:
-        """Get list of unique phone numbers with latest message preview."""
-        try:
-            # Get all messages, group by phone in Python
-            r = db().table("messages").select("phone, message, direction, sender_type, created_at")\
-                .eq("client_id", client_id)\
-                .order("created_at", desc=True)\
-                .limit(500)\
-                .execute()
-
-            if not r.data:
-                return []
-
-            # Group latest per phone
-            seen = {}
-            for msg in r.data:
-                phone = msg["phone"]
-                if phone not in seen:
-                    seen[phone] = {
-                        "phone": phone,
-                        "last_message": msg["message"][:100],
-                        "last_direction": msg["direction"],
-                        "last_sender": msg["sender_type"],
-                        "last_at": msg["created_at"],
-                    }
-
-            # Sort by most recent
-            result = sorted(seen.values(), key=lambda x: x["last_at"], reverse=True)
-            return result
-        except Exception as e:
-            logger.error(f"[DB] get_conversation_list: {e}")
-            return []
+        # Sort by most recent
+        result = sorted(seen.values(), key=lambda x: x["last_at"], reverse=True)
+        return result
+    except Exception as e:
+        logger.error(f"[DB] get_conversation_list: {e}")
+        return []
 
 
-    def get_human_mode_session(client_id: str) -> dict:
-        """Find a customer session that has human_mode active. Returns None if none."""
-        try:
-            r = db().table("sessions").select("*")\
-                .eq("client_id", client_id)\
-                .eq("human_mode", True)\
-                .order("updated_at", desc=True)\
-                .limit(1)\
-                .execute()
-            return r.data[0] if r.data else None
-        except Exception as e:
-            logger.error(f"[DB] get_human_mode_session: {e}")
-            return None
+def get_human_mode_session(client_id: str) -> dict:
+    """Find a customer session that has human_mode active. Returns None if none."""
+    try:
+        r = db().table("sessions").select("*")\
+            .eq("client_id", client_id)\
+            .eq("human_mode", True)\
+            .order("updated_at", desc=True)\
+            .limit(1)\
+            .execute()
+        return r.data[0] if r.data else None
+    except Exception as e:
+        logger.error(f"[DB] get_human_mode_session: {e}")
+        return None
 
 
-    def end_human_mode(client_id: str, phone: str) -> bool:
-        """Turn off human_mode for a customer session."""
-        try:
-            db().table("sessions").update({
-                "human_mode": False,
-                "updated_at": "now()"
-            }).eq("client_id", client_id).eq("phone", phone).execute()
-            return True
-        except Exception as e:
-            logger.error(f"[DB] end_human_mode: {e}")
-            return False
-    
+def end_human_mode(client_id: str, phone: str) -> bool:
+    """Turn off human_mode for a customer session."""
+    try:
+        db().table("sessions").update({
+            "human_mode": False,
+            "updated_at": "now()"
+        }).eq("client_id", client_id).eq("phone", phone).execute()
+        return True
+    except Exception as e:
+        logger.error(f"[DB] end_human_mode: {e}")
+        return False
