@@ -116,6 +116,13 @@ def send_list(to: str, body: str, button_label: str, sections: list[dict], clien
             }
         }
     }
+    # Safety: cap each section at 10 rows (WhatsApp limit)
+    for section in sections:
+        rows = section.get("rows", [])
+        if len(rows) > 10:
+            logger.warning(f"[WA] send_list: capping {len(rows)} rows to 10")
+            section["rows"] = rows[:10]
+
     try:
         r = requests.post(url, json=payload, headers=_headers(_token(client)), timeout=10)
         if r.status_code != 200:
