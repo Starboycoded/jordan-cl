@@ -42,7 +42,7 @@ def get_client_by_slug(slug: str) -> Optional[dict]:
 
 def get_all_clients() -> list:
     try:
-        r = db().table("clients").select("*").eq("active", True).execute()
+        r = _retry(lambda: db().table("clients").select("*").eq("active", True).execute())
         return r.data or []
     except Exception as e:
         logger.error(f"[DB] get_all_clients: {e}")
@@ -267,7 +267,7 @@ def get_customer_orders(client_id: str, phone: str) -> list:
 
 def get_session(client_id: str, phone: str) -> dict:
     try:
-        r = db().table("sessions").select("*").eq("client_id", client_id).eq("phone", phone).execute()
+        r = _retry(lambda: db().table("sessions").select("*").eq("client_id", client_id).eq("phone", phone).execute())
         if r.data:
             return r.data[0]
         return {"client_id": client_id, "phone": phone, "state": "idle", "cart": {}, "context": [], "human_mode": False}
