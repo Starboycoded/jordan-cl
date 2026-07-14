@@ -1,7 +1,8 @@
 # ══════════════════════════════════════════════════════
-# JORDAN v5.4 — BOOKING MODULE
+# JORDAN v5.5 — BOOKING MODULE
 # Handles: services, availability, appointments, status
 # Used by: salon, clinic, booking, consultant templates
+# Supports per-day schedules with break periods.
 # ══════════════════════════════════════════════════════
 
 import logging
@@ -15,8 +16,8 @@ import availability as avail
 logger = logging.getLogger(__name__)
 
 DEFAULT_SLOTS = [
-    "9:00 AM","10:00 AM","11:00 AM","12:00 PM",
-    "1:00 PM","2:00 PM","3:00 PM","4:00 PM","5:00 PM"
+    "9:00 AM", "10:00 AM", "11:00 AM", "12:00 PM",
+    "1:00 PM", "2:00 PM", "3:00 PM", "4:00 PM", "5:00 PM"
 ]
 
 BUTTON_MAP = {
@@ -28,13 +29,28 @@ BUTTON_MAP = {
 
 
 def is_trigger(message: str, button_id: str) -> bool:
+    """Check if this message should be handled by the booking module."""
     btn = (button_id or "").lower()
     msg = message.lower().strip()
+
+    # Button-based triggers
     if btn in BUTTON_MAP or btn.startswith(("svc_", "date_", "time_", "bk_", "apt_")):
         return True
-    if msg in ("services", "book", "book appointment", "my bookings", "appointments",
-               "hi", "hello", "hey", "start", "menu"):
+
+    # Text triggers — direct matches
+    if msg in ("services", "book", "book appointment", "book now",
+               "schedule", "schedule appointment", "new appointment",
+               "my bookings", "my appointments", "appointments", "bookings",
+               "hi", "hello", "hey", "start", "menu", "restart",
+               "what do you offer", "what services", "show services"):
         return True
+
+    # Partial matches — catch variations
+    for phrase in ("book appointment", "book a", "schedule", "make appointment",
+                   "new booking", "services", "my booking", "my appointment"):
+        if phrase in msg:
+            return True
+
     return False
 
 
@@ -79,13 +95,18 @@ def handle(phone: str, message: str, button_id: str,
         _send_welcome(phone, name, client)
         return
 
-    # Services list
-    if msg in ("services", "book", "book appointment", "what do you offer", "menu"):
+    # Services list — text triggers (direct + partial matches)
+    if msg in ("services", "book", "book appointment", "book now",
+               "schedule", "schedule appointment", "new appointment",
+               "what do you offer", "what services", "show services",
+               "menu") or any(p in msg for p in ("book appointment", "book a",
+               "schedule an", "make appointment", "new booking", "services")):
         _show_services(phone, client)
         return
 
     # My bookings
-    if msg in ("my bookings", "my appointments", "bookings", "appointments"):
+    if msg in ("my bookings", "my appointments", "bookings", "appointments") or \
+       any(p in msg for p in ("my booking", "my appointment")):
         _show_my_bookings(phone, client_id, phone, client)
         return
 
@@ -109,7 +130,7 @@ def handle(phone: str, message: str, button_id: str,
         _show_booking_summary(phone, client, session)
         return
 
-    # Fallback
+    # Fallback — show welcome
     _send_welcome(phone, name, client)
 
 
@@ -175,21 +196,25 @@ def _show_date_picker(phone, service, client):
     client_id = str(client["id"])
     currency  = client.get("currency", "NGN")
     today     = date.today()
-    slots     = _get_slots(client)
+    bc        = _get_booking_config(client)
+    days_ahead = bc.get("days_ahead", 14)
 
     # Find first 3 days with availability
     buttons = []
-    for i in range(1, 14):
+    for i in range(1, min(days_ahead + 1, 31)):
         if len(buttons) >= 3:
             break
-        d     = today + timedelta(days=i)
-        avail_slots = avail.get_available_slots(client_id, d.isoformat(), slots)
+        d = today + timedelta(days=i)
+        day_slots = avail.get_slots_for_date(bc, d)
+        if not day_slots:
+            continue  # day closed or no slots configured
+        avail_slots = avail.get_available_slots(client_id, d.isoformat(), day_slots)
         if avail_slots:
             buttons.append({"id": f"date_{d.isoformat()}", "title": d.strftime("%a %d %b")})
 
     if not buttons:
         wa.send_text(phone,
-            "😔 No available slots in the next 2 weeks. Please contact us directly.", client)
+            "😔 No available slots in the next few weeks. Please contact us directly.", client)
         return
 
     wa.send_buttons(phone,
@@ -210,24 +235,54 @@ def _handle_typed_date(phone, message, client, session):
 
 def _select_date(phone, chosen_date, client, session):
     client_id = str(client["id"])
-    slots     = _get_slots(client)
-    available = avail.get_available_slots(client_id, chosen_date, slots)
+    bc        = _get_booking_config(client)
 
     try:
-        label = date.fromisoformat(chosen_date).strftime("%A, %d %B %Y")
+        d_obj = date.fromisoformat(chosen_date)
+        label = d_obj.strftime("%A, %d %B %Y")
     except Exception:
+        d_obj = None
         label = chosen_date
+
+    # Get slots for this specific date using per-day schedule
+    if d_obj:
+        all_day_slots = avail.get_slots_for_date(bc, d_obj)
+    else:
+        all_day_slots = bc.get("time_slots", DEFAULT_SLOTS)
+
+    if not all_day_slots:
+        # Day is closed (e.g., Sunday)
+        day_name = d_obj.strftime("%A") if d_obj else chosen_date
+        alternatives = avail.get_next_available(client_id, booking_config=bc,
+                                                 start_date=d_obj)
+        if alternatives:
+            msg = f"📅 We're closed on *{day_name}*.\n\n✅ *Next available:*\n"
+            for opt in alternatives[:3]:
+                try:
+                    lbl = date.fromisoformat(opt["date"]).strftime("%a %d %b")
+                except Exception:
+                    lbl = opt["date"]
+                msg += f"📅 *{lbl}*: {' · '.join(opt['slots'][:3])}\n"
+            msg += "\nReply with a date to continue."
+        else:
+            msg = f"📅 We're closed on *{day_name}*. Please try a different day."
+        session["state"] = "awaiting_date"
+        _save(client_id, phone, session)
+        wa.send_text(phone, msg, client)
+        return
+
+    available = avail.get_available_slots(client_id, chosen_date, all_day_slots)
 
     session["booking"]["date"] = chosen_date
     session["state"]           = "awaiting_time"
     _save(client_id, phone, session)
 
     if not available:
-        alts = avail.get_next_available(client_id, slots,
-            start_date=date.fromisoformat(chosen_date) if chosen_date else None)
-        if alts:
+        alternatives = avail.get_next_available(client_id, booking_config=bc,
+                                                 start_date=d_obj)
+        if alternatives:
             msg = f"😔 No available slots on *{label}*.\n\n✅ *Next available:*\n"
-            for opt in alts:
+            for opt in alternatives[:3]:
                 try:
                     lbl = date.fromisoformat(opt["date"]).strftime("%a %d %b")
                 except Exception:
@@ -257,11 +312,20 @@ def _select_date(phone, chosen_date, client, session):
 def _select_time(phone, time_label, client, session, customer):
     client_id  = str(client["id"])
     apt_date   = session.get("booking", {}).get("date", "")
-    slots      = _get_slots(client)
+    bc         = _get_booking_config(client)
 
     # Double-check availability
     if apt_date and not avail.is_slot_available(client_id, apt_date, time_label):
-        conflict_msg = avail.build_conflict_message(client_id, apt_date, time_label, slots)
+        try:
+            d_obj = date.fromisoformat(apt_date)
+        except Exception:
+            d_obj = None
+        if d_obj:
+            all_day_slots = avail.get_slots_for_date(bc, d_obj)
+        else:
+            all_day_slots = bc.get("time_slots", DEFAULT_SLOTS)
+        conflict_msg = avail.build_conflict_message(client_id, apt_date, time_label, 
+                                                     all_day_slots, bc)
         wa.send_text(phone, conflict_msg, client)
         return
 
@@ -350,10 +414,22 @@ def _show_my_bookings(phone, client_id, customer_phone, client):
     wa.send_text(phone, text.strip(), client)
 
 
-def _get_slots(client):
+def _get_booking_config(client: dict) -> dict:
+    """Get the booking config from the client's template."""
     from templates_config import get_template
     t = get_template(client.get("template", "booking"))
-    return t.get("booking_config", {}).get("time_slots", DEFAULT_SLOTS)
+    return t.get("booking_config", {})
+
+
+def _get_slots(client: dict, specific_date: date = None) -> list:
+    """
+    Get time slots for a client. If specific_date is provided and the template
+    has a per-day schedule, returns slots for that day. Falls back to flat slots.
+    """
+    bc = _get_booking_config(client)
+    if bc.get("schedule") and specific_date:
+        return avail.get_slots_for_date(bc, specific_date)
+    return bc.get("time_slots", DEFAULT_SLOTS)
 
 
 def _save(client_id, phone, session):
