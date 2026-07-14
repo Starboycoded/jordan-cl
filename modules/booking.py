@@ -47,7 +47,8 @@ def is_trigger(message: str, button_id: str) -> bool:
 
     # Partial matches — catch variations
     for phrase in ("book appointment", "book a", "schedule", "make appointment",
-                   "new booking", "services", "my booking", "my appointment"):
+                   "new booking", "services", "my booking", "my appointment",
+                   "cancel booking", "cancel appointment", "cancel my"):
         if phrase in msg:
             return True
 
@@ -110,12 +111,15 @@ def handle(phone: str, message: str, button_id: str,
         _show_my_bookings(phone, client_id, phone, client)
         return
 
-    # Cancel
-    if msg in ("cancel", "cancel booking"):
-        session["state"]   = "idle"
-        session["booking"] = {}
-        _save(client_id, phone, session)
-        wa.send_text(phone, "No problem! Type *SERVICES* to browse and book anytime. 😊", client)
+    # Cancel — show active appointments to cancel
+    if msg in ("cancel", "cancel booking", "cancel appointment", "cancel my booking") or \
+       any(p in msg for p in ("cancel booking", "cancel appointment", "cancel my")):
+        _show_cancel_options(phone, client_id, phone, client, customer)
+        return
+
+    # Cancel specific appointment by ref
+    if btn.startswith("cancel_apt_"):
+        _cancel_appointment(phone, btn.replace("cancel_apt_", ""), client, session, customer)
         return
 
     # Awaiting typed date
@@ -479,6 +483,70 @@ def _confirm_booking(phone, client, session, customer):
     from merchant import notify_new_appointment
     threading.Thread(target=notify_new_appointment,
         args=(appointment or {"ref": ref, **b}, customer, client), daemon=True).start()
+
+
+def _show_cancel_options(phone, client_id, customer_phone, client, customer):
+    """Show customer their active appointments and let them pick which to cancel."""
+    currency = client.get("currency", "NGN")
+    apts = db_layer.get_customer_appointments(client_id, customer_phone)
+    active = [a for a in (apts or []) if a.get("status") in ("pending", "confirmed")]
+    
+    if not active:
+        wa.send_buttons(phone,
+            "You don't have any active appointments to cancel! 📋",
+            [{"id": "bk_services", "title": "📋 Book Appointment"}], client)
+        return
+    
+    if len(active) == 1:
+        a = active[0]
+        wa.send_buttons(phone,
+            f"📋 *Cancel This Appointment?*\n\n"
+            f"🔢 {a['ref']}\n"
+            f"💆 {a['service_name']}\n"
+            f"📅 {a['date']} at {a['time']}\n"
+            f"💰 {currency} {int(float(a.get('price',0))):,}\n\n"
+            f"Confirm cancellation?", 
+            [{"id": f"cancel_apt_{a['ref']}", "title": "✅ Yes, Cancel It"},
+             {"id": "bk_mybooks", "title": "↩ No, Keep It"}], client)
+    else:
+        # Multiple appointments — show as buttons
+        buttons = []
+        for a in active[:3]:
+            label = f"{a['ref']} — {a['service_name'][:15]} ({a['date']})"
+            buttons.append({"id": f"cancel_apt_{a['ref']}", "title": label[:20]})
+        wa.send_buttons(phone,
+            f"📋 You have {len(active)} active appointments. Which would you like to cancel?", 
+            buttons, client)
+
+
+def _cancel_appointment(phone, ref, client, session, customer):
+    """Actually cancel an appointment by ref."""
+    client_id = str(client["id"])
+    currency  = client.get("currency", "NGN")
+    
+    # Verify this appointment belongs to this customer
+    apts = db_layer.get_customer_appointments(client_id, phone)
+    match = next((a for a in (apts or []) if a.get("ref") == ref), None)
+    
+    if not match:
+        wa.send_text(phone, 
+            "I couldn't find that appointment. Type *MY BOOKINGS* to see your appointments.", 
+            client)
+        return
+    
+    ok = db_layer.update_appointment_status(ref, client_id, "cancelled")
+    
+    if ok:
+        wa.send_text(phone,
+            f"✅ *Appointment Cancelled*\n\n"
+            f"🔢 {ref}\n"
+            f"💆 {match['service_name']}\n"
+            f"📅 {match['date']} at {match['time']}\n\n"
+            f"Any time you need us, we're here! 😊", client)
+    else:
+        wa.send_text(phone,
+            "Sorry, something went wrong. Please try again or contact us directly.", 
+            client)
 
 
 def _show_my_bookings(phone, client_id, customer_phone, client):
