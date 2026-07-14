@@ -51,6 +51,7 @@ app.permanent_session_lifetime = timedelta(days=30)
 
 _original_send_text    = wa.send_text
 _original_send_buttons = wa.send_buttons
+_original_send_list    = wa.send_list
 
 def _logged_send_text(phone, text, client, msg_id=None):
     try:
@@ -71,8 +72,18 @@ def _logged_send_buttons(phone, text, buttons, client):
     except Exception:
         return _original_send_buttons(phone, text, buttons, client)
 
+def _logged_send_list(phone, body, button_label, sections, client):
+    try:
+        result = _original_send_list(phone, body, button_label, sections, client)
+        if client and isinstance(client, dict) and client.get("id"):
+            db_layer.log_message(str(client["id"]), phone, "outgoing", body, None, "jordan")
+        return result
+    except Exception:
+        return _original_send_list(phone, body, button_label, sections, client)
+
 wa.send_text    = _logged_send_text
 wa.send_buttons = _logged_send_buttons
+wa.send_list    = _logged_send_list
 
 # In-memory session cache (backed by Supabase for persistence)
 _session_cache: dict = {}   # key: f"{client_id}:{phone}"
