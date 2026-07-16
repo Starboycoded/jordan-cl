@@ -471,8 +471,11 @@ function showSection(name,tab){
   if(el)el.classList.add('active');
   if(tab)tab.classList.add('active');
 }
+window.showSection=showSection;
 function filterOrders(s){document.querySelectorAll('#ordersTable tbody tr').forEach(r=>{r.style.display=(!s||r.dataset.status===s)?'':'none'});}
+window.filterOrders=filterOrders;
 function filterApts(s){document.querySelectorAll('#appointmentsGrid .apt-card').forEach(c=>{c.style.display=(!s||c.dataset.status===s)?'':'none'});}
+window.filterApts=filterApts;
 
 async function updateOrderStatus(ref,status){
   if(!status)return;
@@ -593,16 +596,7 @@ async function sendBroadcast(){
 }
 
 function toast(msg,type){const el=document.getElementById('toast');el.textContent=msg;el.className='on'+(type==='err'?' err':'');clearTimeout(tt);tt=setTimeout(()=>el.className='',2800);}
-    // Fix: attach key functions to window for onclick handlers
-    window.showSection=showSection;
-    window.filterOrders=filterOrders;
-    window.filterApts=filterApts;
-    window.updateOrderStatus=updateOrderStatus;
-    window.updateAptStatus=updateAptStatus;
-    window.updateLeadStatus=updateLeadStatus;
-    window.sendBroadcast=sendBroadcast;
-    window.toast=toast;
-    
+window.toast=toast;
 
     // ═══════════════════════════════════════════════════
     // MESSAGE INBOX (v5.6)
