@@ -34,7 +34,7 @@ def is_trigger(message: str, button_id: str) -> bool:
     msg = message.lower().strip()
 
     # Button-based triggers
-    if btn in BUTTON_MAP or btn.startswith(("svc_", "date_", "time_", "bk_", "apt_")):
+    if btn in BUTTON_MAP or btn.startswith(("svc_", "date_", "time_", "bk_", "apt_", "cancel_apt_")):
         return True
 
     # Text triggers — direct matches
@@ -526,7 +526,7 @@ def _cancel_appointment(phone, ref, client, session, customer):
     
     # Verify this appointment belongs to this customer
     apts = db_layer.get_customer_appointments(client_id, phone)
-    match = next((a for a in (apts or []) if a.get("ref") == ref), None)
+    match = next((a for a in (apts or []) if a.get("ref", "").upper() == ref.upper()), None)
     
     if not match:
         wa.send_text(phone, 
