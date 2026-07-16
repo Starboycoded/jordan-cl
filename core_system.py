@@ -805,51 +805,53 @@ def api_reply(slug: str):
 
 
 
-    @app.route("/api/<slug>/toggle-ai", methods=["POST"])
-    def api_toggle_ai(slug: str):
-        """Toggle AI auto-responder on/off for a specific phone number."""
-        secret = request.args.get("secret", "") or request.headers.get("X-Admin-Secret", "")
-        if secret != ADMIN_SECRET:
-            from flask import session as flask_session
-            if not flask_session.get("logged_in"):
-                return jsonify({"error": "Unauthorized"}), 403
 
-        client = db_layer.get_client_by_slug(slug)
-        if not client:
-            return jsonify({"error": "Client not found"}), 404
-
-        data = request.get_json(silent=True) or {}
-        phone = data.get("phone", "").strip()
-        enabled = data.get("enabled", True)  # True = AI ON, False = AI OFF (human takeover)
-
-        if not phone:
-            return jsonify({"error": "phone required"}), 400
-
-        key = f"{slug}:{phone}"
-        with _ai_pause_lock:
-            if enabled:
-                AI_PAUSED.pop(key, None)
-            else:
-                AI_PAUSED[key] = True
-
-        return jsonify({"success": True, "phone": phone, "ai_enabled": enabled})
-
-
-    @app.route("/api/<slug>/ai-status")
-    def api_ai_status(slug: str):
-        """Check if AI is paused for a phone number."""
-        secret = request.args.get("secret", "") or request.headers.get("X-Admin-Secret", "")
-        if secret != ADMIN_SECRET:
+@app.route("/api/<slug>/toggle-ai", methods=["POST"])
+def api_toggle_ai(slug: str):
+    """Toggle AI auto-responder on/off for a specific phone number."""
+    secret = request.args.get("secret", "") or request.headers.get("X-Admin-Secret", "")
+    if secret != ADMIN_SECRET:
+        from flask import session as flask_session
+        if not flask_session.get("logged_in"):
             return jsonify({"error": "Unauthorized"}), 403
 
-        phone = request.args.get("phone", "").strip()
-        if not phone:
-            return jsonify({"error": "phone required"}), 400
+    client = db_layer.get_client_by_slug(slug)
+    if not client:
+        return jsonify({"error": "Client not found"}), 404
 
-        key = f"{slug}:{phone}"
-        paused = key in AI_PAUSED
-        return jsonify({"phone": phone, "ai_enabled": not paused})
-    
+    data = request.get_json(silent=True) or {}
+    phone = data.get("phone", "").strip()
+    enabled = data.get("enabled", True)
+
+    if not phone:
+        return jsonify({"error": "phone required"}), 400
+
+    key = f"{slug}:{phone}"
+    with _ai_pause_lock:
+        if enabled:
+            AI_PAUSED.pop(key, None)
+        else:
+            AI_PAUSED[key] = True
+
+    return jsonify({"success": True, "phone": phone, "ai_enabled": enabled})
+
+
+@app.route("/api/<slug>/ai-status")
+def api_ai_status(slug: str):
+    """Check if AI is paused for a phone number."""
+    secret = request.args.get("secret", "") or request.headers.get("X-Admin-Secret", "")
+    if secret != ADMIN_SECRET:
+        return jsonify({"error": "Unauthorized"}), 403
+
+    phone = request.args.get("phone", "").strip()
+    if not phone:
+        return jsonify({"error": "phone required"}), 400
+
+    key = f"{slug}:{phone}"
+    paused = key in AI_PAUSED
+    return jsonify({"phone": phone, "ai_enabled": not paused})
+
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
