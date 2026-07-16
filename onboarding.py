@@ -108,21 +108,28 @@ def onboard_step2():
     template_cards = ""
     for bt in business_types:
         key = bt["key"]
-        template_cards += f"""
-<label class="template-card" for="t_{key}">
-  <input type="radio" name="template" id="t_{key}" value="{key}" {"checked" if key == "commerce" else ""}>
-  <div class="tc-inner">
-    <div class="tc-emoji">{bt['emoji']}</div>
-    <div class="tc-name">{bt['name']}</div>
-    <div class="tc-desc">{bt['desc']}</div>
-  </div>
-</label>"""
+        sel = " selected" if key == "commerce" else ""
+        template_cards += '<div class="tcard' + sel + '" onclick="window.pickTemplate(&#39;' + key + '&#39;, this)" data-key="' + key + '">'
+        template_cards += '<div class="tcard-icon">' + bt["emoji"] + '</div>'
+        template_cards += '<div class="tcard-title">' + bt["name"] + '</div>'
+        template_cards += '<div class="tcard-desc">' + bt["desc"] + '</div>'
+        template_cards += '</div>'
 
-    form = f"""
-<form method="POST">
-  <div class="template-grid">{template_cards}</div>
-  <button type="submit" class="btn-primary" style="margin-top:24px;width:100%">Continue →</button>
-</form>"""
+    form = """<p class="sub">Pick the template that matches your business. This pre-configures your store.</p>
+<form method="POST" id="template-form">
+  <input type="hidden" name="template" id="template-input" value="commerce">
+  <input type="hidden" name="business_name" value="""" + name + """">
+  <input type="hidden" name="slug" value="""" + slug + """">
+  <div class="tcard-grid">""" + template_cards + """</div>
+  <button type="submit" class="btn-primary" style="width:100%;margin-top:20px">Continue →</button>
+</form>
+<script>
+window.pickTemplate=function(key,el){
+  document.querySelectorAll('.tcard').forEach(function(c){c.classList.remove('selected');});
+  el.classList.add('selected');
+  document.getElementById('template-input').value=key;
+};
+</script>"""
 
     return _render(form, title="Choose Your Store Type", step=2)
 
