@@ -488,6 +488,22 @@ def api_update_order(slug: str, order_ref: str):
     return jsonify({"success": ok})
 
 
+@app.route("/api/<slug>/appointments/<ref>/status", methods=["PUT"])
+def api_update_appointment(slug: str, ref: str):
+    if not _require_admin(request):
+        return jsonify({"error": "Unauthorized"}), 403
+    client = db_layer.get_client_by_slug(slug)
+    if not client:
+        return jsonify({"error": "Client not found"}), 404
+    body = request.json or {}
+    status = body.get("status", "")
+    valid = {"pending", "confirmed", "completed", "no_show", "cancelled"}
+    if status not in valid:
+        return jsonify({"error": f"Status must be one of: {sorted(valid)}"}), 400
+    ok = db_layer.update_appointment_status(ref, str(client["id"]), status)
+    return jsonify({"success": ok})
+
+
 # ─────────────────────────────────────────────────────
 # CLIENT MANAGEMENT API
 # ─────────────────────────────────────────────────────
