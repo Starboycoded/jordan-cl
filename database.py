@@ -5,6 +5,7 @@
 import os
 import json
 import logging
+import time
 from datetime import date
 from typing import Optional
 from supabase import create_client, Client
@@ -25,6 +26,29 @@ def db() -> Client:
             raise RuntimeError("SUPABASE_URL and SUPABASE_KEY must be set.")
         _client = create_client(SUPABASE_URL, SUPABASE_KEY)
     return _client
+
+
+def _retry(fn, max_retries=3, base_delay=0.5):
+    """Retry a callable with exponential-ish backoff for transient Supabase errors."""
+    last_err = None
+    for attempt in range(max_retries + 1):
+        try:
+            return fn()
+        except Exception as e:
+            last_err = e
+            err_str = str(e).lower()
+            # Only retry on transient errors (network, timeout, resource unavailable)
+            is_transient = any(kw in err_str for kw in [
+                "errno 11", "resource temporarily unavailable",
+                "timeout", "connection", "network", "too many requests",
+                "503", "502", "504", "429"
+            ])
+            if not is_transient or attempt >= max_retries:
+                raise
+            delay = base_delay * (attempt + 1)
+            logger.warning(f"[DB] _retry attempt {attempt+1}/{max_retries} after {delay}s: {e}")
+            time.sleep(delay)
+    raise last_err
 
 
 # ─────────────────────────────────────────────────────
