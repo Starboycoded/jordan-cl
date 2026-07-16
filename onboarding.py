@@ -6,7 +6,7 @@
 import os
 import re
 import json
-from flask import Blueprint, request, jsonify, redirect, url_for
+from flask import Blueprint, request, jsonify, redirect, url_for, session
 import database as db_layer
 from templates_config import TEMPLATES
 
@@ -14,6 +14,13 @@ onboarding = Blueprint("onboarding", __name__)
 
 ADMIN_SECRET   = os.environ.get("ADMIN_SECRET", "CodedLabs2025")
 CATALOG_BASE   = os.environ.get("CATALOG_BASE_URL", "https://bot-test-wddr.onrender.com/shop")
+
+
+# Session-based state for onboarding
+def _get_onboard_state():
+    if "onboarding" not in session:
+        session["onboarding"] = {}
+    return session["onboarding"]
 
 
 # ─────────────────────────────────────────────────────
@@ -365,7 +372,7 @@ def onboard_done():
 
 def _q(s: str) -> str:
     from urllib.parse import quote
-    return quote(s)
+    return quote(s) if s else ""
 
 
 def _render(content: str, title: str = "Jordan Setup", step: int = 0) -> str:
@@ -439,6 +446,18 @@ code{{background:#0b0b15;border:1px solid var(--b);border-radius:6px;padding:4px
 .next-steps strong{{font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--m);display:block;margin-bottom:10px}}
 .next-steps ol{{padding-left:18px;font-size:13px;line-height:2;color:var(--m)}}
 select.inp{{appearance:none}}
+    .tcard-grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:16px 0}}
+    .tcard{{background:var(--bg);border:2px solid var(--b);border-radius:12px;padding:14px 12px;cursor:pointer;transition:all .2s;text-align:center}}
+    .tcard:hover{{border-color:var(--g);transform:translateY(-2px)}}
+    .tcard.selected{{border-color:var(--g);background:rgba(20,184,166,.08);box-shadow:0 0 20px rgba(20,184,166,.1)}}
+    .tcard-icon{{font-size:28px;margin-bottom:6px}}
+    .tcard-title{{font-size:13px;font-weight:700;margin-bottom:3px}}
+    .tcard-desc{{font-size:10px;color:var(--m);line-height:1.4}}
+    .secret-box{{background:var(--bg);border:1px solid var(--b);border-radius:12px;padding:16px;margin-bottom:20px;text-align:center}}
+    .secret-box strong{{display:block;font-size:12px;color:var(--m);margin-bottom:8px}}
+    .secret-box code{{font-size:18px;font-weight:700;color:var(--g);background:#0a1f0f;padding:6px 14px;border-radius:8px;letter-spacing:1px}}
+    .secret-box p{{font-size:11px;color:var(--m);margin-top:8px}}
+    select.inp{{appearance:none}}
 </style>
 </head><body>
 <div class="brand"><span>⚡</span> Jordan by CodedLabs</div>
@@ -483,3 +502,51 @@ def _step1_form(name: str = "", slug: str = "", currency: str = "NGN", errors: l
   <button type="submit" class="btn-primary" style="width:100%">Continue →</button>
 </form>
 """
+
+def _step2_form(name: str = "", slug: str = "", template: str = "commerce") -> str:
+    import json as _json
+    cats = [
+        ("commerce", "🛍️", "Online Store", "Sell products on WhatsApp with cart & checkout"),
+        ("food", "🍱", "Food & Restaurant", "Menu, orders, delivery management"),
+        ("fashion", "👗", "Fashion & Clothing", "Clothes, shoes, bags, accessories"),
+        ("beauty", "💄", "Beauty & Skincare", "Skincare, makeup, haircare"),
+        ("electronics", "⚡", "Electronics", "Phones, laptops, accessories"),
+        ("booking", "📅", "Booking & Appointments", "Salons, clinics, consultants"),
+        ("clinic", "🏥", "Medical Clinic", "Doctor appointments, prescriptions"),
+        ("salon", "💇", "Salon & Spa", "Hair, nails, beauty appointments"),
+        ("consultant", "💼", "Consulting", "Professional services, coaching"),
+        ("lead_gen", "🔥", "Lead Generation", "Capture & qualify potential customers"),
+        ("real_estate", "🏠", "Real Estate", "Property listings, inquiries, viewings"),
+        ("agency", "🎯", "Digital Agency", "Service packages, client inquiries"),
+        ("support", "🎧", "Customer Support", "FAQ bot, ticket system"),
+        ("general", "📦", "General Business", "Custom setup for any business"),
+    ]
+
+    cards_html = []
+    for key, icon, title, desc in cats:
+        sel = "selected" if key == template else ""
+        cards_html.append(
+            '<div class="tcard ' + sel + '" onclick="window.selectTemplate(&#39;' + 
+            key + '&#39;, this)" data-key="' + key + '">'
+            '<div class="tcard-icon">' + icon + '</div>'
+            '<div class="tcard-title">' + title + '</div>'
+            '<div class="tcard-desc">' + desc + '</div>'
+            '</div>'
+        )
+    cards = "".join(cards_html)
+
+    return """<p class="sub">Pick the template that best matches your business. This pre-configures your store with the right features.</p>
+    <form method="POST" id="template-form">
+      <input type="hidden" name="template" id="template-input" value="""" + template + """">
+      <input type="hidden" name="business_name" value="""" + name + """">
+      <input type="hidden" name="slug" value="""" + slug + """">
+      <div class="tcard-grid">""" + cards + """</div>
+      <button type="submit" class="btn-primary" style="width:100%;margin-top:20px">Continue →</button>
+    </form>
+    <script>
+    window.selectTemplate=function(key,el){
+      document.querySelectorAll('.tcard').forEach(function(c){c.classList.remove('selected');});
+      el.classList.add('selected');
+      document.getElementById('template-input').value=key;
+    };
+    </script>"""
