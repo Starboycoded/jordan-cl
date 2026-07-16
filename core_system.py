@@ -34,6 +34,10 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger(__name__)
 
 ADMIN_SECRET    = os.environ.get("ADMIN_SECRET", "CodedLabs2025")
+
+# In-memory AI pause tracker (per-conversation takeover)
+AI_PAUSED = {}
+_ai_pause_lock = threading.Lock()
 VERIFY_TOKEN    = os.environ.get("VERIFY_TOKEN", "jordan_verify_2025")
 CATALOG_BASE    = os.environ.get("CATALOG_BASE_URL", "https://bot-test-wddr.onrender.com/shop")
 BANK_DETAILS    = os.environ.get("BANK_DETAILS", "Bank: GTBank\nAccount: 0123456789\nName: CodedLabs")
