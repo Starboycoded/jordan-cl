@@ -394,12 +394,18 @@ def get_storefront_theme(name: str) -> dict:
 def get_business_types() -> list:
     """Return selectable business types for onboarding."""
     return [
-        {"key": "commerce",    "name": "Online Store",           "emoji": "🛍️", "desc": "Sell products on WhatsApp"},
+        {"key": "commerce",    "name": "Online Store",           "emoji": "🛍️", "desc": "Sell products on WhatsApp with cart & checkout"},
+        {"key": "food",        "name": "Food & Restaurant",      "emoji": "🍱", "desc": "Menu, orders, delivery management"},
         {"key": "fashion",     "name": "Fashion & Clothing",     "emoji": "👗", "desc": "Clothes, shoes, bags, accessories"},
-        {"key": "beauty",      "name": "Beauty & Skincare",      "emoji": "💄", "desc": "Skincare, makeup, haircare"},
-        {"key": "food",        "name": "Food & Restaurant",      "emoji": "🍱", "desc": "Meals, drinks, delivery"},
+        {"key": "beauty",      "name": "Beauty & Skincare",      "emoji": "💄", "desc": "Skincare, makeup, haircare products"},
         {"key": "electronics", "name": "Electronics & Gadgets",  "emoji": "⚡", "desc": "Phones, laptops, accessories"},
         {"key": "booking",     "name": "Booking & Appointments", "emoji": "📅", "desc": "Salons, clinics, consultants"},
-        {"key": "lead_gen",    "name": "Lead Generation",        "emoji": "🔥", "desc": "Real estate, insurance, agencies"},
-        {"key": "support",     "name": "Customer Support",       "emoji": "💬", "desc": "FAQs, info, escalation"},
+        {"key": "clinic",      "name": "Medical Clinic",         "emoji": "🏥", "desc": "Doctor appointments, prescriptions"},
+        {"key": "salon",       "name": "Salon & Spa",            "emoji": "💇", "desc": "Hair, nails, beauty appointments"},
+        {"key": "consultant",  "name": "Consulting Services",    "emoji": "💼", "desc": "Professional services, coaching"},
+        {"key": "lead_gen",    "name": "Lead Generation",        "emoji": "🔥", "desc": "Capture & qualify potential customers"},
+        {"key": "real_estate", "name": "Real Estate",            "emoji": "🏠", "desc": "Property listings, inquiries, viewings"},
+        {"key": "agency",      "name": "Digital Agency",         "emoji": "🎯", "desc": "Service packages, client inquiries"},
+        {"key": "support",     "name": "Customer Support",       "emoji": "💬", "desc": "FAQ bot, ticket system, info desk"},
+        {"key": "general",     "name": "General Business",       "emoji": "📦", "desc": "Custom setup for any business type"},
     ]
