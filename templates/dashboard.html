@@ -114,7 +114,7 @@
         .inbox-conv-preview{font-size:11px;color:var(--m);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         .inbox-conv-time{font-size:10px;color:var(--m);margin-top:3px}
         .inbox-chat{flex:1;display:flex;flex-direction:column;min-width:0}
-        .inbox-chat-head{padding:14px 20px;border-bottom:1px solid var(--b);background:var(--s)}
+        .inbox-chat-head{padding:14px 20px;border-bottom:1px solid var(--b);background:var(--s);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
         .inbox-chat-body{flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:8px}
         .inbox-chat-foot{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--b);background:var(--s)}
         .msg-bubble{max-width:75%;padding:10px 14px;border-radius:14px;font-size:13px;line-height:1.5;word-wrap:break-word}
@@ -125,9 +125,46 @@
         .msg-date-divider{text-align:center;font-size:11px;color:var(--m);padding:8px 0}
         .inp-row-gap{display:flex;gap:8px;align-items:center}
         @media(max-width:768px){
-            .inbox-layout{flex-direction:column;height:auto}
-            .inbox-sidebar{width:100%;min-width:0;max-height:200px;border-right:none;border-bottom:1px solid var(--b)}
-            .inbox-chat-body{min-height:300px}
+            .nav{overflow-x:auto;-webkit-overflow-scrolling:touch;padding:10px 12px 0;gap:2px}
+            .nav-tab{padding:8px 12px;font-size:11px;white-space:nowrap;flex-shrink:0}
+            .wrap{padding:12px 8px 40px}
+            header{padding:10px 12px}
+            header h1{font-size:13px}
+            .hdr-btn{padding:5px 10px;font-size:11px}
+            .stats{grid-template-columns:repeat(2,1fr);gap:8px}
+            .stat{padding:12px}
+            .stat-n{font-size:18px}
+            .inbox-layout{flex-direction:column;height:calc(100vh - 160px);min-height:400px;border-radius:10px}
+            .inbox-sidebar{width:100%;min-width:0;max-height:35%;border-right:none;border-bottom:1px solid var(--b);border-radius:10px 10px 0 0}
+            .inbox-sidebar-head{padding:10px 12px;flex-wrap:wrap;gap:6px}
+            .inbox-conv-item{padding:10px 12px}
+            .inbox-conv-phone{font-size:12px}
+            .inbox-conv-preview{font-size:10px}
+            .inbox-chat{flex:1;min-height:0}
+            .inbox-chat-head{padding:10px 12px;display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+            .inbox-chat-body{padding:10px 12px;min-height:0}
+            .inbox-chat-foot{padding:8px 10px;gap:6px}
+            .inbox-chat-foot input{font-size:13px !important}
+            .inbox-chat-foot button{font-size:12px !important;padding:6px 12px !important}
+            .msg-bubble{max-width:85%;font-size:12px;padding:8px 12px}
+            #ai-toggle-wrap{margin-left:0;width:100%;justify-content:flex-start}
+            table{font-size:11px}
+            th,td{padding:8px 10px}
+            .card{border-radius:10px}
+            .card-head{padding:10px 14px}
+            .prod-grid{grid-template-columns:repeat(2,1fr);gap:8px;padding:10px}
+            .btn,.btn-sm{padding:7px 14px;font-size:12px}
+        }
+        
+        @media(max-width:480px){
+            .stats{grid-template-columns:repeat(2,1fr)}
+            .nav-tab{padding:7px 10px;font-size:10px}
+            header h1{font-size:12px}
+            .tag{display:none}
+            .inbox-sidebar{max-height:30%}
+            .prod-grid{grid-template-columns:1fr 1fr}
+            #ai-toggle-wrap button{font-size:9px;padding:4px 10px}
+            .msg-bubble{max-width:90%;font-size:11px}
         }
     
   
@@ -149,7 +186,7 @@
 </header>
 
 <div class="nav">
-  {% set first = true %}
+  {% set first = false %}
   {% if modules.commerce %}
   <button class="nav-tab {{ 'active' if first }}" onclick="showSection('products',this)">📦 Products</button>
   <button class="nav-tab" onclick="showSection('orders',this)">🛒 Orders</button>
@@ -166,7 +203,8 @@
   {% if modules.support %}
   <button class="nav-tab" onclick="showSection('faqs',this)">❓ FAQs</button>
   {% endif %}
-  <button class="nav-tab" onclick="showSection('inbox',this);loadConversations()">💬 Inbox</button>
+  {% set first = true %}
+  <button class="nav-tab {{'active' if first}}" onclick="showSection('inbox',this);loadConversations()">💬 Inbox</button>
   <button class="nav-tab" onclick="showSection('broadcast',this)">📣 Broadcast</button>
   <button class="nav-tab" onclick="showSection('analytics',this)">📊 Analytics</button>
 </div>
@@ -612,31 +650,14 @@ window.toast=function(msg,type){const el=document.getElementById('toast');el.tex
     }
 
     window.updateAIToggleUI = function() {
-      const badge = document.getElementById('ai-status-badge');
-      const btn = document.getElementById('ai-toggle-btn');
-      if (!badge || !btn) return;
-      
-      badge.style.display = 'inline-block';
-      btn.style.display = 'inline-block';
+      const wrap = document.getElementById('ai-toggle-wrap');
+      if (!wrap) return;
+      wrap.style.display = 'flex';
       
       if (aiEnabled) {
-        badge.textContent = '🤖 Auto';
-        badge.style.background = 'rgba(20,184,166,.15)';
-        badge.style.color = '#14B8A6';
-        btn.textContent = '🛑 Take Over';
-        btn.style.background = 'rgba(239,68,68,.1)';
-        btn.style.color = '#ef4444';
-        btn.style.border = '1px solid rgba(239,68,68,.3)';
-        btn.title = 'Pause AI — you handle replies manually';
+        wrap.innerHTML = '<span style="font-size:11px;color:var(--m);margin-right:6px">🤖</span><span style="font-size:11px;font-weight:600;color:#14B8A6;margin-right:10px">AI Active</span><button onclick="window.toggleAI()" style="font-size:10px;font-weight:700;padding:5px 12px;border-radius:20px;cursor:pointer;background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.25);font-family:inherit;transition:all .2s" onmouseenter="this.style.background=\'rgba(239,68,68,.22)\'" onmouseleave="this.style.background=\'rgba(239,68,68,.12)\'">Take Over</button>';
       } else {
-        badge.textContent = '👤 You';
-        badge.style.background = 'rgba(59,130,246,.15)';
-        badge.style.color = '#3b82f6';
-        btn.textContent = '🤖 Resume AI';
-        btn.style.background = 'rgba(20,184,166,.1)';
-        btn.style.color = '#14B8A6';
-        btn.style.border = '1px solid rgba(20,184,166,.3)';
-        btn.title = 'Resume AI auto-replies';
+        wrap.innerHTML = '<span style="font-size:11px;color:var(--m);margin-right:6px">👤</span><span style="font-size:11px;font-weight:600;color:#3b82f6;margin-right:10px">You</span><button onclick="window.toggleAI()" style="font-size:10px;font-weight:700;padding:5px 12px;border-radius:20px;cursor:pointer;background:rgba(20,184,166,.12);color:#14B8A6;border:1px solid rgba(20,184,166,.25);font-family:inherit;transition:all .2s" onmouseenter="this.style.background=\'rgba(20,184,166,.22)\'" onmouseleave="this.style.background=\'rgba(20,184,166,.12)\'">Resume AI</button>';
       }
     }
 
@@ -690,10 +711,7 @@ window.toast=function(msg,type){const el=document.getElementById('toast');el.tex
       const items=document.querySelectorAll('.inbox-conv-item');
       items.forEach(el=>{if(el.querySelector('.inbox-conv-phone')?.textContent?.includes(phone))el.classList.add('active');});
       // Header
-      document.getElementById('chat-head').innerHTML=`
-            <span style="font-weight:600;font-size:14px">💬 +${phone}</span>
-            <span id="ai-status-badge" style="display:none;font-size:11px;padding:3px 10px;border-radius:12px;margin-left:12px;font-weight:600"></span>
-            <button id="ai-toggle-btn" onclick="window.toggleAI()" style="display:none;font-size:11px;padding:4px 12px;border-radius:6px;margin-left:8px;cursor:pointer;font-weight:600"></button>`;
+      document.getElementById('chat-head').innerHTML=`<span style="font-weight:600;font-size:14px">💬 +${phone}</span><span id="ai-toggle-wrap" style="display:none;align-items:center;margin-left:auto;flex-shrink:0"></span>`;
       // Show reply box
       document.getElementById('chat-foot').style.display='flex';
       // Load
@@ -758,6 +776,13 @@ window.toast=function(msg,type){const el=document.getElementById('toast');el.tex
     }
 
     window.escHtml=function(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+    // Page init: if inbox is default tab, load conversations
+    (function(){
+      if (document.querySelector(".nav-tab.active")?.textContent?.includes("Inbox")) {
+        loadConversations();
+      }
+    })();
     
 </script>
 </body>
