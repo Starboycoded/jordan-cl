@@ -602,16 +602,16 @@ window.toast=function(msg,type){const el=document.getElementById('toast');el.tex
 
     let aiEnabled = true;  // current AI state for active conversation
 
-    window.checkAIStatus = async function(phone) {
+    async function checkAIStatus(phone) {
       try {
         const r = await fetch(`/api/${SLUG}/ai-status?secret=${SECRET}&phone=${phone}`);
         const d = await r.json();
         aiEnabled = d.ai_enabled;
-        window.updateAIToggleUI();
+        updateAIToggleUI();
       } catch(e) { /* ignore */ }
     }
 
-    window.updateAIToggleUI = function() {
+    function updateAIToggleUI() {
       const badge = document.getElementById('ai-status-badge');
       const btn = document.getElementById('ai-toggle-btn');
       if (!badge || !btn) return;
@@ -640,7 +640,7 @@ window.toast=function(msg,type){const el=document.getElementById('toast');el.tex
       }
     }
 
-    window.toggleAI = async function() {
+    async function toggleAI() {
       if (!activePhone) return;
       const newState = !aiEnabled;
       try {
@@ -652,7 +652,7 @@ window.toast=function(msg,type){const el=document.getElementById('toast');el.tex
         const d = await r.json();
         if (d.success) {
           aiEnabled = newState;
-          window.updateAIToggleUI();
+          updateAIToggleUI();
           window.toast(aiEnabled ? '🤖 AI resumed — Jordan will reply automatically' : '🛑 AI paused — you are handling replies', '');
         }
       } catch(e) {
@@ -684,16 +684,19 @@ window.toast=function(msg,type){const el=document.getElementById('toast');el.tex
     }
 
     window.selectConversation=async function(phone){
+    // Hide toggle for previous conversation
+    const badge = document.getElementById('ai-status-badge');
+    const btn = document.getElementById('ai-toggle-btn');
+    if (badge) badge.style.display = 'none';
+    if (btn) btn.style.display = 'none';
+
       activePhone=phone;
       // Highlight
       document.querySelectorAll('.inbox-conv-item').forEach(el=>el.classList.remove('active'));
       const items=document.querySelectorAll('.inbox-conv-item');
       items.forEach(el=>{if(el.querySelector('.inbox-conv-phone')?.textContent?.includes(phone))el.classList.add('active');});
       // Header
-      document.getElementById('chat-head').innerHTML=`
-            <span style="font-weight:600;font-size:14px">💬 +${phone}</span>
-            <span id="ai-status-badge" style="display:none;font-size:11px;padding:3px 10px;border-radius:12px;margin-left:12px;font-weight:600"></span>
-            <button id="ai-toggle-btn" onclick="window.toggleAI()" style="display:none;font-size:11px;padding:4px 12px;border-radius:6px;margin-left:8px;cursor:pointer;font-weight:600"></button>`;
+      document.getElementById('chat-head').innerHTML=`<span style="font-weight:600;font-size:14px">💬 +${phone}</span>`;
       // Show reply box
       document.getElementById('chat-foot').style.display='flex';
       // Load
@@ -701,7 +704,6 @@ window.toast=function(msg,type){const el=document.getElementById('toast');el.tex
       // Start polling
       if(pollTimer)clearInterval(pollTimer);
       pollTimer=setInterval(()=>window.loadMessages(phone,true),5000);
-      window.checkAIStatus(phone);
     }
 
     window.loadMessages=async function(phone,silent=false){

@@ -197,6 +197,15 @@ def process_message(phone: str, message: str, message_id: str, client: dict, but
     # Mark as read
     wa.mark_read(message_id, client)
 
+    # ── AI TAKEOVER CHECK (v5.7) ──
+    # When AI is paused for this phone, skip auto-processing.
+    # Merchant commands still work; only customer auto-replies are paused.
+    slug = client.get("slug", "")
+    pause_key = f"{slug}:{phone}"
+    if pause_key in AI_PAUSED and not merch.is_merchant(phone, client):
+        logger.info(f"[AI_PAUSED] Skipping auto-reply for {pause_key}")
+        return
+
 
     # ── HUMAN HANDOFF RELAY (v5.6) ──
     # When merchant messages while a customer has human_mode active,
