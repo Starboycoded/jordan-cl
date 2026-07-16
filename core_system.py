@@ -778,29 +778,33 @@ def api_messages(slug: str):
     )
     return jsonify({"messages": messages, "phone": phone or None})
 
-    @app.route("/api/<slug>/reply", methods=["POST"])
-    def api_reply(slug: str):
-        """Send a reply as Jordan from the dashboard inbox."""
-        secret = request.args.get("secret", "") or request.headers.get("X-Admin-Secret", "")
-        if secret != ADMIN_SECRET:
-            from flask import session as flask_session
-            if not flask_session.get("logged_in"):
-                return jsonify({"error": "Unauthorized"}), 403
 
-        client = db_layer.get_client_by_slug(slug)
-        if not client:
-            return jsonify({"error": "Client not found"}), 404
+@app.route("/api/<slug>/reply", methods=["POST"])
+def api_reply(slug: str):
+    """Send a reply as Jordan from the dashboard inbox."""
+    secret = request.args.get("secret", "") or request.headers.get("X-Admin-Secret", "")
+    if secret != ADMIN_SECRET:
+        from flask import session as flask_session
+        if not flask_session.get("logged_in"):
+            return jsonify({"error": "Unauthorized"}), 403
 
-        data = request.get_json(silent=True) or {}
-        phone = data.get("phone", "").strip()
-        message = data.get("message", "").strip()
+    client = db_layer.get_client_by_slug(slug)
+    if not client:
+        return jsonify({"error": "Client not found"}), 404
 
-        if not phone or not message:
-            return jsonify({"error": "phone and message required"}), 400
+    data = request.get_json(silent=True) or {}
+    phone = data.get("phone", "").strip()
+    message = data.get("message", "").strip()
 
-        success = wa.send_text(phone, message, client)
-        return jsonify({"success": success, "phone": phone})
-    
+    if not phone or not message:
+        return jsonify({"error": "phone and message required"}), 400
+
+    import whatsapp as wa
+    success = wa.send_text(phone, message, client)
+    return jsonify({"success": success, "phone": phone})
+
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port, debug=False)
