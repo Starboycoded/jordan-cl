@@ -85,11 +85,23 @@
     #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(10px);background:#1a3a24;color:#e8f5ec;padding:11px 20px;border-radius:20px;font-size:13px;opacity:0;transition:all .25s;pointer-events:none;z-index:300;border:1px solid var(--g);white-space:nowrap}
     #toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
     #toast.err{background:#2a0a0a;border-color:var(--red);color:#fca5a5}
-    .apt-grid{display:grid;gap:10px;padding:16px}
-    .apt-card{background:var(--bg);border:1px solid var(--b);border-left:3px solid var(--g);border-radius:8px;padding:12px;display:grid;grid-template-columns:1fr auto;align-items:center;gap:12px}
-    .apt-name{font-size:13px;font-weight:700;margin-bottom:3px}
-    .apt-meta{font-size:11px;color:var(--m)}
-    select.status-sel{background:var(--b);border:1px solid #2a2a3a;color:var(--text);padding:5px 8px;border-radius:6px;font-size:11px;cursor:pointer;font-family:inherit}
+    .apt-table{width:100%;border-collapse:collapse;font-size:13px}
+    .apt-table thead th{text-align:left;padding:12px 16px;font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--m);font-weight:700;border-bottom:2px solid var(--b);background:var(--s);position:sticky;top:0;z-index:1}
+    .apt-table tbody td{padding:14px 16px;border-bottom:1px solid var(--b);vertical-align:middle}
+    .apt-table tbody tr{transition:background .15s}
+    .apt-table tbody tr:hover{background:rgba(255,255,255,.02)}
+    .apt-table .apt-service{font-weight:600;font-size:13px}
+    .apt-table .apt-phone{font-size:12px;color:var(--m);font-family:monospace}
+    .apt-table .apt-date{font-size:12px;white-space:nowrap}
+    .apt-status{display:inline-block;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;text-transform:capitalize;letter-spacing:.3px}
+    .apt-status.pending{background:rgba(245,158,11,.12);color:#f59e0b}
+    .apt-status.confirmed{background:rgba(37,211,102,.12);color:#22c55e}
+    .apt-status.completed{background:rgba(20,184,166,.12);color:#14b8a6}
+    .apt-status.cancelled{background:rgba(239,68,68,.12);color:#ef4444}
+    .apt-status.no_show{background:rgba(139,92,246,.12);color:#8b5cf6}
+    select.status-sel{background:var(--b);border:1px solid #2a2a3a;color:var(--text);padding:6px 10px;border-radius:8px;font-size:11px;cursor:pointer;font-family:inherit;font-weight:600;transition:border-color .15s}
+    select.status-sel:hover{border-color:var(--g)}
+    select.status-sel:focus{outline:none;border-color:var(--g);box-shadow:0 0 0 3px rgba(37,211,102,.1)}
     .pipeline{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;padding:16px}
     .pipe-col{background:var(--bg);border:1px solid var(--b);border-radius:10px;padding:12px}
     .pipe-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--m);margin-bottom:8px}
@@ -154,6 +166,12 @@
             .card-head{padding:10px 14px}
             .prod-grid{grid-template-columns:repeat(2,1fr);gap:8px;padding:10px}
             .btn,.btn-sm{padding:7px 14px;font-size:12px}
+            .apt-table thead{display:none}
+            .apt-table tbody tr{display:grid;grid-template-columns:1fr auto;gap:8px;padding:12px 0;border-bottom:2px solid var(--b)}
+            .apt-table tbody td{display:block;padding:4px 8px;border:none}
+            .apt-table tbody td:last-child{text-align:right!important}
+            .apt-date{font-size:11px}
+            .apt-phone{font-size:11px}
         }
         
         @media(max-width:480px){
@@ -308,28 +326,43 @@
         <option value="cancelled">Cancelled</option>
       </select>
     </div>
-    <div class="apt-grid" id="appointmentsGrid">
+    <div style="overflow-x:auto">
+      <table class="apt-table" id="appointmentsGrid">
+        <thead>
+          <tr>
+            <th>Service</th>
+            <th>Date &amp; Time</th>
+            <th>Customer</th>
+            <th>Status</th>
+            <th style="text-align:right">Action</th>
+          </tr>
+        </thead>
+        <tbody>
       {% for a in appointments %}
-      {% set sc = '#f59e0b' if a.status == 'pending' else '#22c55e' if a.status in ('confirmed','completed') else '#ef4444' %}
-      <div class="apt-card" style="border-left-color:{{ sc }}" data-status="{{ a.status }}">
-        <div>
-          <div class="apt-name">{{ a.service_name }}</div>
-          <div class="apt-meta">📅 {{ a.date }} at {{ a.time }}</div>
-          <div class="apt-meta">📞 +{{ a.phone }}</div>
-          {% if a.notes %}<div class="apt-meta">📝 {{ a.notes }}</div>{% endif %}
-          <div class="apt-meta" style="color:{{ sc }}">{{ a.status | title }}</div>
-        </div>
-        <select class="status-sel" onchange="updateAptStatus('{{ a.ref }}', this.value)">
-          <option value="">Update…</option>
-          <option value="confirmed">Confirm</option>
-          <option value="completed">Completed</option>
-          <option value="no_show">No Show</option>
-          <option value="cancelled">Cancel</option>
-        </select>
-      </div>
+      {% set sc = 'pending' if a.status == 'pending' else 'confirmed' if a.status == 'confirmed' else 'completed' if a.status == 'completed' else 'cancelled' if a.status == 'cancelled' else 'no_show' %}
+          <tr data-status="{{ a.status }}">
+            <td>
+              <div class="apt-service">{{ a.service_name }}</div>
+              {% if a.notes %}<div style="font-size:10px;color:var(--m);margin-top:2px">📝 {{ a.notes }}</div>{% endif %}
+            </td>
+            <td><span class="apt-date">📅 {{ a.date }} at {{ a.time }}</span></td>
+            <td><span class="apt-phone">+{{ a.phone }}</span></td>
+            <td><span class="apt-status {{ sc }}">{{ a.status | title }}</span></td>
+            <td style="text-align:right">
+              <select class="status-sel" onchange="updateAptStatus('{{ a.ref }}', this.value)">
+                <option value="">Update…</option>
+                <option value="confirmed">✅ Confirm</option>
+                <option value="completed">✔️ Completed</option>
+                <option value="no_show">🚫 No Show</option>
+                <option value="cancelled">❌ Cancel</option>
+              </select>
+            </td>
+          </tr>
       {% else %}
-      <div class="empty-state">No appointments yet</div>
+          <tr><td colspan="5"><div class="empty-state">No appointments yet</div></td></tr>
       {% endfor %}
+        </tbody>
+      </table>
     </div>
   </div>
 </div>
@@ -510,7 +543,7 @@ window.showSection=function(name,tab){
   if(tab)tab.classList.add('active');
 };
 window.filterOrders=function(s){document.querySelectorAll('#ordersTable tbody tr').forEach(r=>{r.style.display=(!s||r.dataset.status===s)?'':'none'});};
-window.filterApts=function(s){document.querySelectorAll('#appointmentsGrid .apt-card').forEach(c=>{c.style.display=(!s||c.dataset.status===s)?'':'none'});};
+window.filterApts=function(s){document.querySelectorAll('#appointmentsGrid tbody tr').forEach(r=>{r.style.display=(!s||r.dataset.status===s)?'':'none'});};
 
 window.updateOrderStatus=async function(ref,status){
   if(!status)return;
