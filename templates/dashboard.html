@@ -777,9 +777,11 @@ window.toast=function(msg,type){const el=document.getElementById('toast');el.tex
 
     window.escHtml=function(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
-    // Page init: if inbox is default tab, load conversations
+    // Page init: if inbox is default tab, show it and load conversations
     (function(){
-      if (document.querySelector(".nav-tab.active")?.textContent?.includes("Inbox")) {
+      const activeTab = document.querySelector(".nav-tab.active");
+      if (activeTab?.textContent?.includes("Inbox")) {
+        document.getElementById("section-inbox")?.classList.add("active");
         loadConversations();
       }
     })();
