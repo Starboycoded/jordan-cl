@@ -599,6 +599,67 @@ window.toast=function(msg,type){const el=document.getElementById('toast');el.tex
     // ═══════════════════════════════════════════════════
     let activePhone=null,pollTimer=null;
 
+
+    let aiEnabled = true;  // current AI state for active conversation
+
+    async function checkAIStatus(phone) {
+      try {
+        const r = await fetch(`/api/${SLUG}/ai-status?secret=${SECRET}&phone=${phone}`);
+        const d = await r.json();
+        aiEnabled = d.ai_enabled;
+        updateAIToggleUI();
+      } catch(e) { /* ignore */ }
+    }
+
+    function updateAIToggleUI() {
+      const badge = document.getElementById('ai-status-badge');
+      const btn = document.getElementById('ai-toggle-btn');
+      if (!badge || !btn) return;
+      
+      badge.style.display = 'inline-block';
+      btn.style.display = 'inline-block';
+      
+      if (aiEnabled) {
+        badge.textContent = '🤖 Auto';
+        badge.style.background = 'rgba(20,184,166,.15)';
+        badge.style.color = '#14B8A6';
+        btn.textContent = '🛑 Take Over';
+        btn.style.background = 'rgba(239,68,68,.1)';
+        btn.style.color = '#ef4444';
+        btn.style.border = '1px solid rgba(239,68,68,.3)';
+        btn.title = 'Pause AI — you handle replies manually';
+      } else {
+        badge.textContent = '👤 You';
+        badge.style.background = 'rgba(59,130,246,.15)';
+        badge.style.color = '#3b82f6';
+        btn.textContent = '🤖 Resume AI';
+        btn.style.background = 'rgba(20,184,166,.1)';
+        btn.style.color = '#14B8A6';
+        btn.style.border = '1px solid rgba(20,184,166,.3)';
+        btn.title = 'Resume AI auto-replies';
+      }
+    }
+
+    async function toggleAI() {
+      if (!activePhone) return;
+      const newState = !aiEnabled;
+      try {
+        const r = await fetch(`/api/${SLUG}/toggle-ai?secret=${SECRET}`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({phone: activePhone, enabled: newState})
+        });
+        const d = await r.json();
+        if (d.success) {
+          aiEnabled = newState;
+          updateAIToggleUI();
+          window.toast(aiEnabled ? '🤖 AI resumed — Jordan will reply automatically' : '🛑 AI paused — you are handling replies', '');
+        }
+      } catch(e) {
+        window.toast('Failed to toggle AI', 'err');
+      }
+    }
+
     window.loadConversations=async function(){
       const list=document.getElementById('conv-list');
       list.innerHTML='<div class="empty-state">Loading...</div>';
@@ -623,6 +684,12 @@ window.toast=function(msg,type){const el=document.getElementById('toast');el.tex
     }
 
     window.selectConversation=async function(phone){
+    // Hide toggle for previous conversation
+    const badge = document.getElementById('ai-status-badge');
+    const btn = document.getElementById('ai-toggle-btn');
+    if (badge) badge.style.display = 'none';
+    if (btn) btn.style.display = 'none';
+
       activePhone=phone;
       // Highlight
       document.querySelectorAll('.inbox-conv-item').forEach(el=>el.classList.remove('active'));
