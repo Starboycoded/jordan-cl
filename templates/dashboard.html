@@ -464,41 +464,38 @@
 const SLUG='{{ client.slug }}',SECRET='{{ secret }}',CURRENCY='{{ currency }}';
 let editProd=null,editFaq=null,prodFile=null,tt;
 
-function showSection(name,tab){
+window.showSection=function(name,tab){
   document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
   const el=document.getElementById('section-'+name);
   if(el)el.classList.add('active');
   if(tab)tab.classList.add('active');
-}
-window.showSection=showSection;
-function filterOrders(s){document.querySelectorAll('#ordersTable tbody tr').forEach(r=>{r.style.display=(!s||r.dataset.status===s)?'':'none'});}
-window.filterOrders=filterOrders;
-function filterApts(s){document.querySelectorAll('#appointmentsGrid .apt-card').forEach(c=>{c.style.display=(!s||c.dataset.status===s)?'':'none'});}
-window.filterApts=filterApts;
+};
+window.filterOrders=function(s){document.querySelectorAll('#ordersTable tbody tr').forEach(r=>{r.style.display=(!s||r.dataset.status===s)?'':'none'});};
+window.filterApts=function(s){document.querySelectorAll('#appointmentsGrid .apt-card').forEach(c=>{c.style.display=(!s||c.dataset.status===s)?'':'none'});};
 
-async function updateOrderStatus(ref,status){
+window.updateOrderStatus=async function(ref,status){
   if(!status)return;
   const r=await fetch(`/api/${SLUG}/orders/${ref}/status?secret=${SECRET}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status,notify_customer:true})});
   const d=await r.json();
-  toast(d.success?`${ref} → ${status} ✅`:'Failed',d.success?'':'err');
+  window.window.toast(d.success?`${ref} → ${status} ✅`:'Failed',d.success?'':'err');
   if(d.success)setTimeout(()=>location.reload(),800);
 }
-async function updateAptStatus(ref,status){
+window.updateAptStatus=async function(ref,status){
   if(!status)return;
   const r=await fetch(`/api/${SLUG}/appointments/${ref}/status?secret=${SECRET}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status})});
   const d=await r.json();
-  toast(d.success?`Updated ✅`:'Failed',d.success?'':'err');
+  window.window.toast(d.success?`Updated ✅`:'Failed',d.success?'':'err');
   if(d.success)setTimeout(()=>location.reload(),800);
 }
-async function updateLeadStatus(ref,status){
+window.updateLeadStatus=async function(ref,status){
   const r=await fetch(`/api/${SLUG}/leads/${ref}/status?secret=${SECRET}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status})});
   const d=await r.json();
-  toast(d.success?'Updated ✅':'Failed',d.success?'':'err');
+  window.window.toast(d.success?'Updated ✅':'Failed',d.success?'':'err');
   if(d.success)setTimeout(()=>location.reload(),800);
 }
 
-function openAddProduct(){
+window.openAddProduct=function(){
   editProd=null;prodFile=null;
   document.getElementById('prodModalTitle').textContent='Add Product';
   document.getElementById('prod-save-btn').textContent='Add Product';
@@ -512,7 +509,7 @@ function openAddProduct(){
   document.getElementById('prod-result').textContent='';
   document.getElementById('prodModal').classList.add('on');
 }
-function editProduct(id,name,price,stock,desc,img){
+window.editProduct=function(id,name,price,stock,desc,img){
   editProd=id;prodFile=null;
   document.getElementById('prodModalTitle').textContent='Edit Product';
   document.getElementById('prod-save-btn').textContent='Save Changes';
@@ -526,67 +523,67 @@ function editProduct(id,name,price,stock,desc,img){
   document.getElementById('prod-result').textContent='';
   document.getElementById('prodModal').classList.add('on');
 }
-function onDrop(e){e.preventDefault();const f=e.dataTransfer.files[0];if(f)setFile(f);}
-function onFile(e){const f=e.target.files[0];if(f)setFile(f);}
-function setFile(f){
-  if(f.size>5*1024*1024){toast('Max 5MB','err');return;}
+window.onDrop=function(e){e.preventDefault();const f=e.dataTransfer.files[0];if(f)window.setFile(f);}
+window.onFile=function(e){const f=e.target.files[0];if(f)window.setFile(f);}
+window.setFile=function(f){
+  if(f.size>5*1024*1024){window.toast('Max 5MB','err');return;}
   prodFile=f;
   const r=new FileReader();
   r.onload=e=>{const p=document.getElementById('prod-img-preview');p.src=e.target.result;p.style.display='block';document.getElementById('prod-img-text').style.display='none';};
   r.readAsDataURL(f);
 }
-async function uploadImg(){
+window.uploadImg=async function(){
   if(!prodFile)return document.getElementById('prod-img-url').value||'';
   const form=new FormData();form.append('image',prodFile);form.append('slug',SLUG);
   const r=await fetch(`/api/${SLUG}/upload-image?secret=${SECRET}`,{method:'POST',body:form});
   const d=await r.json();
-  if(!r.ok){toast('Upload failed: '+(d.error||r.status),'err');return null;}
+  if(!r.ok){window.toast('Upload failed: '+(d.error||r.status),'err');return null;}
   return d.url||null;
 }
-async function saveProduct(){
+window.saveProduct=async function(){
   const name=document.getElementById('prod-name').value.trim();
   const price=parseFloat(document.getElementById('prod-price').value);
-  if(!name||isNaN(price)){toast('Name and price required','err');return;}
+  if(!name||isNaN(price)){window.toast('Name and price required','err');return;}
   const btn=document.getElementById('prod-save-btn');
   btn.textContent='Saving...';btn.disabled=true;
   try{
-    const imgUrl=await uploadImg();
+    const imgUrl=await window.uploadImg();
     const body={name,price,stock:parseInt(document.getElementById('prod-stock').value)||0,description:document.getElementById('prod-desc').value,active:document.getElementById('prod-active').checked,image_url:imgUrl||''};
     const url=editProd?`/api/${SLUG}/products/${editProd}?secret=${SECRET}`:`/api/${SLUG}/products?secret=${SECRET}`;
     const r=await fetch(url,{method:editProd?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     const d=await r.json();
-    if(r.ok){toast('Saved! ✅');document.getElementById('prodModal').classList.remove('on');setTimeout(()=>location.reload(),600);}
-    else{toast(d.error||'Save failed','err');}
-  }catch(e){toast('Error: '+e.message,'err');}
+    if(r.ok){window.window.toast('Saved! ✅');document.getElementById('prodModal').classList.remove('on');setTimeout(()=>location.reload(),600);}
+    else{window.toast(d.error||'Save failed','err');}
+  }catch(e){window.window.toast('Error: '+e.message,'err');}
   finally{btn.textContent=editProd?'Save Changes':'Add Product';btn.disabled=false;}
 }
-async function deleteProduct(id,name){
+window.deleteProduct=async function(id,name){
   if(!confirm(`Delete "${name}"?`))return;
   const r=await fetch(`/api/${SLUG}/products/${id}?secret=${SECRET}`,{method:'DELETE'});
   const d=await r.json();
-  toast(d.success?'Deleted':'Failed',d.success?'':'err');
+  window.window.toast(d.success?'Deleted':'Failed',d.success?'':'err');
   if(d.success)setTimeout(()=>location.reload(),600);
 }
 
-function openAddFaq(){editFaq=null;document.getElementById('faqModalTitle').textContent='Add FAQ';document.getElementById('faq-q').value='';document.getElementById('faq-a').value='';document.getElementById('faq-result').textContent='';document.getElementById('faqModal').classList.add('on');}
-function editFaq(id,q,a){editFaq=id;document.getElementById('faqModalTitle').textContent='Edit FAQ';document.getElementById('faq-q').value=q;document.getElementById('faq-a').value=a;document.getElementById('faq-result').textContent='';document.getElementById('faqModal').classList.add('on');}
-async function saveFaq(){
+window.openAddFaq=function(){editFaq=null;document.getElementById('faqModalTitle').textContent='Add FAQ';document.getElementById('faq-q').value='';document.getElementById('faq-a').value='';document.getElementById('faq-result').textContent='';document.getElementById('faqModal').classList.add('on');}
+window.editFaq=function(id,q,a){editFaq=id;document.getElementById('faqModalTitle').textContent='Edit FAQ';document.getElementById('faq-q').value=q;document.getElementById('faq-a').value=a;document.getElementById('faq-result').textContent='';document.getElementById('faqModal').classList.add('on');}
+window.saveFaq=async function(){
   const q=document.getElementById('faq-q').value.trim(),a=document.getElementById('faq-a').value.trim();
-  if(!q||!a){toast('Question and answer required','err');return;}
+  if(!q||!a){window.toast('Question and answer required','err');return;}
   const url=editFaq?`/api/${SLUG}/faqs/${editFaq}?secret=${SECRET}`:`/api/${SLUG}/faqs?secret=${SECRET}`;
   const r=await fetch(url,{method:editFaq?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q,answer:a})});
   const d=await r.json();
-  if(r.ok){toast('Saved! ✅');document.getElementById('faqModal').classList.remove('on');setTimeout(()=>location.reload(),600);}
-  else toast(d.error||'Failed','err');
+  if(r.ok){window.window.toast('Saved! ✅');document.getElementById('faqModal').classList.remove('on');setTimeout(()=>location.reload(),600);}
+  else window.toast(d.error||'Failed','err');
 }
-async function deleteFaq(id){
+window.deleteFaq=async function(id){
   if(!confirm('Delete this FAQ?'))return;
   const r=await fetch(`/api/${SLUG}/faqs/${id}?secret=${SECRET}`,{method:'DELETE'});
-  toast((await r.json()).success?'Deleted':'Failed',(await r.json()).success?'':'err');
+  window.window.toast((await r.json()).success?'Deleted':'Failed',(await r.json()).success?'':'err');
   setTimeout(()=>location.reload(),600);
 }
 
-async function sendBroadcast(){
+window.sendBroadcast=async function(){
   const msg=document.getElementById('bcast-msg').value.trim();
   const el=document.getElementById('bcast-result');
   if(!msg){el.textContent='Write a message first.';return;}
@@ -595,15 +592,14 @@ async function sendBroadcast(){
   el.textContent=(await r.json()).message||'Started!';
 }
 
-function toast(msg,type){const el=document.getElementById('toast');el.textContent=msg;el.className='on'+(type==='err'?' err':'');clearTimeout(tt);tt=setTimeout(()=>el.className='',2800);}
-window.toast=toast;
+window.toast=function(msg,type){const el=document.getElementById('toast');el.textContent=msg;el.className='on'+(type==='err'?' err':'');clearTimeout(tt);tt=setTimeout(()=>el.className='',2800);};
 
     // ═══════════════════════════════════════════════════
     // MESSAGE INBOX (v5.6)
     // ═══════════════════════════════════════════════════
     let activePhone=null,pollTimer=null;
 
-    async function loadConversations(){
+    window.loadConversations=async function(){
       const list=document.getElementById('conv-list');
       list.innerHTML='<div class="empty-state">Loading...</div>';
       try{
@@ -617,16 +613,16 @@ window.toast=toast;
           const dir=c.last_direction==='incoming'?'📥':'📤';
           const sender=c.last_sender==='merchant'?' (you)':c.last_sender==='jordan'?' (Jordan)':'';
           const time=c.last_at?new Date(c.last_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'';
-          return `<div class="inbox-conv-item${cls}" onclick="selectConversation('${c.phone}')">
+          return `<div class="inbox-conv-item${cls}" onclick="window.selectConversation('${c.phone}')">
             <div class="inbox-conv-phone">${dir} +${c.phone}</div>
-            <div class="inbox-conv-preview">${sender} ${escHtml(c.last_message||'')}</div>
+            <div class="inbox-conv-preview">${sender} ${window.escHtml(c.last_message||'')}</div>
             <div class="inbox-conv-time">${time}</div>
           </div>`;
         }).join('');
       }catch(e){list.innerHTML='<div class="empty-state">Failed to load</div>';}
     }
 
-    async function selectConversation(phone){
+    window.selectConversation=async function(phone){
       activePhone=phone;
       // Highlight
       document.querySelectorAll('.inbox-conv-item').forEach(el=>el.classList.remove('active'));
@@ -637,13 +633,13 @@ window.toast=toast;
       // Show reply box
       document.getElementById('chat-foot').style.display='flex';
       // Load
-      await loadMessages(phone);
+      await window.loadMessages(phone);
       // Start polling
       if(pollTimer)clearInterval(pollTimer);
-      pollTimer=setInterval(()=>loadMessages(phone,true),5000);
+      pollTimer=setInterval(()=>window.loadMessages(phone,true),5000);
     }
 
-    async function loadMessages(phone,silent=false){
+    window.loadMessages=async function(phone,silent=false){
       const body=document.getElementById('chat-body');
       if(!silent)body.innerHTML='<div class="empty-state">Loading...</div>';
       try{
@@ -661,7 +657,7 @@ window.toast=toast;
           const time=new Date(m.created_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
           const label=dir==='incoming'?'Customer':sender==='merchant'?'You':'Jordan';
           return `<div class="${cls}">
-            <div>${escHtml(m.message)}</div>
+            <div>${window.escHtml(m.message)}</div>
             <div class="msg-meta"><span>${label}</span><span>${time}</span></div>
           </div>`;
         }).join('');
@@ -670,7 +666,7 @@ window.toast=toast;
       }catch(e){body.innerHTML='<div class="empty-state">Failed to load messages</div>';}
     }
 
-    async function sendReply(){
+    window.sendReply=async function(){
       const input=document.getElementById('reply-input');
       const msg=input.value.trim();
       if(!msg||!activePhone)return;
@@ -679,7 +675,7 @@ window.toast=toast;
       // Append optimistic message
       const body=document.getElementById('chat-body');
       const time=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-      body.innerHTML+=`<div class="msg-bubble msg-outgoing"><div>${escHtml(msg)}</div><div class="msg-meta"><span>Jordan</span><span>${time}</span></div></div>`;
+      body.innerHTML+=`<div class="msg-bubble msg-outgoing"><div>${window.escHtml(msg)}</div><div class="msg-meta"><span>Jordan</span><span>${time}</span></div></div>`;
       body.scrollTop=body.scrollHeight;
       // Send via API
       try{
@@ -688,15 +684,15 @@ window.toast=toast;
           body:JSON.stringify({phone:activePhone,message:msg})
         });
         const d=await r.json();
-        if(!d.success)toast('Failed to send','err');
-      }catch(e){toast('Send failed: '+e.message,'err');}
+        if(!d.success)window.window.toast('Failed to send','err');
+      }catch(e){window.window.toast('Send failed: '+e.message,'err');}
       input.disabled=false;
       input.focus();
       // Refresh messages
-      setTimeout(()=>loadMessages(activePhone,true),1000);
+      setTimeout(()=>window.loadMessages(activePhone,true),1000);
     }
 
-    function escHtml(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+    window.escHtml=function(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
     
 </script>
 </body>
