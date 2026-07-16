@@ -23,6 +23,9 @@ from onboarding import onboarding
 from product_dashboard import dashboard
 from admin_panel import admin_panel
 from auth import auth
+import error_tracker
+
+APP_START_TIME = time.time()
 
 # ─────────────────────────────────────────────────────
 # CONFIG
@@ -298,14 +301,60 @@ def webhook_receive():
         return jsonify({"status": "ok"}), 200
 
     # Process in background thread so webhook returns fast
-    threading.Thread(
-        target=process_message,
-        args=(phone, message, message_id, matched_client),
-        kwargs={"button_id": button_id},
-        daemon=True
-    ).start()
+    def _safe_process():
+        try:
+            process_message(phone, message, message_id, matched_client, button_id=button_id)
+        except Exception as e:
+            error_tracker.track("webhook_drop", str(e), "webhook", critical=True)
+            logger.error(f"[Webhook] process_message failed: {e}")
+
+    threading.Thread(target=_safe_process, daemon=True).start()
 
     return jsonify({"status": "ok"}), 200
+
+
+# ─────────────────────────────────────────────────────
+# MONITORING & HEALTH API
+# ─────────────────────────────────────────────────────
+
+@app.route("/api/admin/health")
+def admin_health():
+    """Full health check with DB + WhatsApp status and error summary."""
+    if not _require_admin(request):
+        return jsonify({"error": "Unauthorized"}), 403
+    return jsonify(error_tracker.full_health_check())
+
+
+@app.route("/api/admin/errors")
+def admin_errors():
+    """Get recent tracked errors."""
+    if not _require_admin(request):
+        return jsonify({"error": "Unauthorized"}), 403
+    minutes = request.args.get("minutes", 60, type=int)
+    limit = request.args.get("limit", 50, type=int)
+    return jsonify({
+        "summary": error_tracker.get_error_summary(),
+        "recent": error_tracker.get_recent_errors(minutes=minutes, limit=limit)
+    })
+
+
+@app.route("/api/admin/metrics")
+def admin_metrics():
+    """Quick operational metrics."""
+    if not _require_admin(request):
+        return jsonify({"error": "Unauthorized"}), 403
+    try:
+        clients = db_layer.get_all_clients()
+        total_clients = len(clients) if isinstance(clients, list) else 0
+        import time as _t
+        return jsonify({
+            "uptime_seconds": round(_t.time() - APP_START_TIME),
+            "clients": total_clients,
+            "cached_sessions": len(_session_cache),
+            "errors": error_tracker.get_error_summary()
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # ─────────────────────────────────────────────────────

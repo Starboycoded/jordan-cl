@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jordan — WhatsApp Commerce OS | CodedLabs</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=Noto+Serif:wght@500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#07070e;--surface:#0f0f18;--border:#1e1e30;--text:#e4e4ec;--text-muted:#8888a0;--accent:#6366F1;--accent-glow:rgba(99,102,241,0.15);--green:#10B981;--amber:#F59E0B;--rose:#EC4899;--cyan:#0EA5E9}
+body{font-family:'Inter Tight',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.6}
+.container{max-width:1100px;margin:0 auto;padding:0 24px}
+nav{position:sticky;top:0;z-index:100;background:rgba(7,7,14,0.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
+nav .container{display:flex;align-items:center;justify-content:space-between;padding:14px 0}
+.logo{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:700}
+.logo-dot{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,var(--accent),#8B5CF6);display:flex;align-items:center;justify-content:center;font-size:16px}
+.nav-links{display:flex;gap:24px;align-items:center}
+.nav-links a{color:var(--text-muted);text-decoration:none;font-size:14px;font-weight:500}
+.nav-links a:hover{color:var(--text)}
+.nav-cta{background:var(--accent);color:#fff!important;padding:8px 18px;border-radius:8px;font-weight:600}
+.hero{position:relative;padding:80px 0 60px;overflow:hidden;background:linear-gradient(180deg,rgba(99,102,241,0.06) 0%,transparent 100%)}
+.hero::before{content:'';position:absolute;top:-60px;right:-80px;width:320px;height:320px;background:radial-gradient(circle,rgba(99,102,241,0.12),transparent 70%);border-radius:50%}
+.hero::after{content:'';position:absolute;bottom:-40px;left:-60px;width:240px;height:240px;background:radial-gradient(circle,rgba(139,92,246,0.08),transparent 70%);border-radius:50%}
+.hero .container{position:relative;z-index:1}
+.hero-badge{display:inline-block;font-size:12px;font-weight:600;color:var(--accent);background:var(--accent-glow);padding:5px 14px;border-radius:20px;margin-bottom:20px}
+.hero h1{font-size:clamp(32px,5vw,52px);font-weight:700;line-height:1.15;letter-spacing:-0.03em;margin-bottom:16px;max-width:700px}
+.hero h1 span{background:linear-gradient(135deg,var(--accent),#8B5CF6);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hero-sub{font-size:17px;color:var(--text-muted);max-width:540px;margin-bottom:32px}
+.hero-actions{display:flex;gap:12px;flex-wrap:wrap}
+.btn{padding:12px 24px;border-radius:10px;font-size:15px;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:8px;transition:all .2s;border:none;font-family:inherit}
+.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:#5558e4;transform:translateY(-1px)}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}
+.btn-outline:hover{border-color:var(--accent);color:var(--accent)}
+.hero-stats{display:flex;gap:40px;margin-top:48px;padding-top:24px;border-top:1px solid var(--border)}
+.stat-value{font-family:'Noto Serif',serif;font-size:36px;font-weight:500;letter-spacing:-0.02em}
+.stat-label{font-size:13px;color:var(--text-muted);margin-top:6px}
+section{padding:80px 0}
+.section-label{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:var(--accent);margin-bottom:12px}
+.section-title{font-size:28px;font-weight:700;letter-spacing:-0.02em;margin-bottom:12px}
+.section-desc{font-size:15px;color:var(--text-muted);max-width:560px;margin-bottom:48px}
+.template-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.template-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;transition:all .2s}
+.template-card:hover{border-color:var(--accent);transform:translateY(-2px)}
+.template-card .emoji{font-size:28px;margin-bottom:10px}
+.template-card .name{font-size:15px;font-weight:600;margin-bottom:4px}
+.template-card .desc{font-size:12px;color:var(--text-muted)}
+.flow-tag{display:inline-block;margin-top:10px;font-size:10px;font-weight:600;padding:3px 8px;border-radius:12px;text-transform:uppercase}
+.flow-booking{background:rgba(16,185,129,0.12);color:var(--green)}
+.flow-commerce{background:rgba(14,165,233,0.12);color:var(--cyan)}
+.flow-leadgen{background:rgba(245,158,11,0.12);color:var(--amber)}
+.features{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px}
+.feature-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:28px}
+.feature-icon{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:16px}
+.feature-card h3{font-size:16px;font-weight:600;margin-bottom:8px}
+.feature-card p{font-size:13px;color:var(--text-muted)}
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:20px}
+.step-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:28px;position:relative}
+.step-num{font-size:48px;font-weight:700;color:var(--accent);opacity:0.15;position:absolute;top:12px;right:20px;font-family:'Noto Serif',serif}
+.step-card h3{font-size:16px;font-weight:600;margin-bottom:8px}
+.step-card p{font-size:13px;color:var(--text-muted)}
+.pricing-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.pricing-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:28px}
+.pricing-card.featured{border-color:var(--accent);background:linear-gradient(180deg,rgba(99,102,241,0.06),var(--surface))}
+.pricing-card .plan{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:8px}
+.pricing-card .price{font-size:32px;font-weight:700;margin-bottom:4px}
+.pricing-card .price span{font-size:15px;font-weight:400;color:var(--text-muted)}
+.pricing-card ul{list-style:none;margin:20px 0}
+.pricing-card ul li{font-size:13px;padding:6px 0;color:var(--text-muted)}
+.pricing-card ul li::before{content:'✓ ';color:var(--green);font-weight:700}
+.cta-section{text-align:center;padding:100px 24px;background:linear-gradient(180deg,rgba(99,102,241,0.08),transparent 60%)}
+.cta-section h2{font-size:32px;font-weight:700;margin-bottom:12px}
+.cta-section p{color:var(--text-muted);margin-bottom:28px;font-size:16px}
+.cta-buttons{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+footer{border-top:1px solid var(--border);padding:40px 0}
+footer .container{display:flex;justify-content:space-between;flex-wrap:wrap;gap:24px}
+.footer-brand{font-size:14px;color:var(--text-muted)}
+.footer-links{display:flex;gap:20px}
+.footer-links a{color:var(--text-muted);text-decoration:none;font-size:13px}
+.footer-links a:hover{color:var(--text)}
+@media(max-width:768px){.nav-links{display:none}.hero{padding:48px 0 40px}.hero-stats{flex-wrap:wrap;gap:24px}.template-grid{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<nav><div class="container"><div class="logo"><div class="logo-dot">J</div>Jordan</div><div class="nav-links"><a href="#templates">Templates</a><a href="#features">Features</a><a href="#how">How</a><a href="#pricing">Pricing</a><a href="https://github.com/Starboycoded/jordan-cl" target="_blank" class="nav-cta">GitHub</a></div></div></nav>
+
+<section class="hero"><div class="container">
+<div class="hero-badge">Now in Production</div>
+<h1>Turn WhatsApp into your <span>sales & booking engine</span></h1>
+<p class="hero-sub">Jordan handles appointments, orders, leads, and support — automatically. Multi-tenant, AI-powered, built for Nigerian businesses selling globally.</p>
+<div class="hero-actions"><a href="#templates" class="btn btn-primary">See Templates</a><a href="https://github.com/Starboycoded/jordan-cl" target="_blank" class="btn btn-outline">View on GitHub</a></div>
+<div class="hero-stats"><div><div class="stat-value">14</div><div class="stat-label">Templates</div></div><div><div class="stat-value">4</div><div class="stat-label">Flows</div></div><div><div class="stat-value">24/7</div><div class="stat-label">Online</div></div></div>
+</div></section>
+
+<section id="templates"><div class="container">
+<div class="section-label">Templates</div><h2 class="section-title">Pick your business type. Go live in minutes.</h2><p class="section-desc">Every template comes pre-configured with AI persona, booking schedule, lead fields, and product categories.</p>
+<div class="template-grid" id="templateGrid"></div>
+</div></section>
+
+<section id="features"><div class="container">
+<div class="section-label">Features</div><h2 class="section-title">Everything your business needs on WhatsApp</h2>
+<div class="features">
+<div class="feature-card"><div class="feature-icon" style="background:rgba(99,102,241,0.12)">📅</div><h3>Smart Booking</h3><p>Per-day schedules with break periods. Double-booking prevention built-in.</p></div>
+<div class="feature-card"><div class="feature-icon" style="background:rgba(16,185,129,0.12)">🛒</div><h3>WhatsApp Commerce</h3><p>Product catalogue, cart, checkout. Supports variants and delivery collection.</p></div>
+<div class="feature-card"><div class="feature-icon" style="background:rgba(245,158,11,0.12)">🔥</div><h3>Lead Qualification</h3><p>Natural conversation collects name, budget, timeline — without feeling like a form.</p></div>
+<div class="feature-card"><div class="feature-icon" style="background:rgba(14,165,233,0.12)">💬</div><h3>AI-Powered Support</h3><p>Claude handles any question. FAQ database. Human handoff mode.</p></div>
+<div class="feature-card"><div class="feature-icon" style="background:rgba(139,92,246,0.12)">📊</div><h3>Admin Dashboard</h3><p>Real-time appointments, orders, leads, conversations. Full message inbox.</p></div>
+<div class="feature-card"><div class="feature-icon" style="background:rgba(236,72,153,0.12)">🔌</div><h3>Multi-Tenant</h3><p>One deployment, unlimited clients. Each with own number, template, dashboard.</p></div>
+</div></div></section>
+
+<section id="how"><div class="container">
+<div class="section-label">How It Works</div><h2 class="section-title">From signup to live in under an hour</h2>
+<div class="steps">
+<div class="step-card"><div class="step-num">01</div><h3>Choose Template</h3><p>Pick from 14 business types — clinic, salon, e-commerce, real estate, agency.</p></div>
+<div class="step-card"><div class="step-num">02</div><h3>Add Services</h3><p>List your services/products with names and prices. Set business hours.</p></div>
+<div class="step-card"><div class="step-num">03</div><h3>Connect WhatsApp</h3><p>Link your Meta WhatsApp number. Jordan handles everything automatically.</p></div>
+<div class="step-card"><div class="step-num">04</div><h3>Go Live</h3><p>Customers message you. Jordan books, sells, and qualifies — you monitor.</p></div>
+</div></div></section>
+
+<section id="pricing"><div class="container">
+<div class="section-label">Pricing</div><h2 class="section-title">Simple, usage-based pricing</h2><p class="section-desc">All plans include unlimited templates and AI responses.</p>
+<div class="pricing-grid">
+<div class="pricing-card"><div class="plan">Starter</div><div class="price">$29<span>/mo</span></div><ul><li>Up to 3 clients</li><li>All 14 templates</li><li>AI responses</li><li>Basic dashboard</li><li>Email support</li></ul><a href="https://github.com/Starboycoded/jordan-cl" target="_blank" class="btn btn-outline" style="display:block;text-align:center">Get Started</a></div>
+<div class="pricing-card featured"><div class="plan" style="color:var(--accent)">Growth</div><div class="price">$79<span>/mo</span></div><ul><li>Up to 15 clients</li><li>All templates</li><li>Priority AI</li><li>Full dashboard</li><li>Broadcasts</li><li>Priority support</li></ul><a href="https://github.com/Starboycoded/jordan-cl" target="_blank" class="btn btn-primary" style="display:block;text-align:center">Get Started</a></div>
+<div class="pricing-card"><div class="plan">Enterprise</div><div class="price">$199<span>/mo</span></div><ul><li>Unlimited clients</li><li>Custom templates</li><li>Dedicated AI</li><li>White-label</li><li>API access</li><li>24/7 support</li></ul><a href="https://github.com/Starboycoded/jordan-cl" target="_blank" class="btn btn-outline" style="display:block;text-align:center">Contact</a></div>
+</div></div></section>
+
+<section class="cta-section"><h2>Ready to automate your WhatsApp?</h2><p>Your customers are already on WhatsApp — meet them there.</p><div class="cta-buttons"><a href="https://github.com/Starboycoded/jordan-cl" target="_blank" class="btn btn-primary">View on GitHub</a><a href="https://jordan-cl.onrender.com" target="_blank" class="btn btn-outline">Live Demo</a></div></section>
+
+<footer><div class="container"><div class="footer-brand">Jordan by <a href="https://www.oasis.codes" target="_blank" style="color:var(--accent);text-decoration:none">CodedLabs</a></div><div class="footer-links"><a href="https://github.com/Starboycoded/jordan-cl" target="_blank">GitHub</a><a href="https://jordan-cl.onrender.com" target="_blank">Demo</a><a href="https://allyhub.com" target="_blank">AllyHub</a></div></div></footer>
+
+<script>
+const templates=[{e:'🛍️',n:'Online Store',d:'Sell products on WhatsApp',f:'commerce'},{e:'👗',n:'Fashion Store',d:'Clothing, shoes, bags',f:'commerce'},{e:'💄',n:'Beauty & Skincare',d:'Skincare, makeup, haircare',f:'commerce'},{e:'🍱',n:'Food & Restaurant',d:'Meals, drinks, delivery',f:'commerce'},{e:'⚡',n:'Electronics',d:'Phones, laptops, gadgets',f:'commerce'},{e:'📅',n:'Booking & Appts',d:'Generic booking system',f:'booking'},{e:'💇',n:'Salon & Spa',d:'Hair, nails, facials',f:'booking'},{e:'🏥',n:'Clinic & Healthcare',d:'Doctor, dental, physio',f:'booking'},{e:'💼',n:'Consultant',d:'Lawyers, accountants',f:'booking'},{e:'🔥',n:'Lead Generation',d:'Real estate, insurance',f:'leadgen'},{e:'🏠',n:'Real Estate',d:'Property sales, rentals',f:'leadgen'},{e:'🚀',n:'Digital Agency',d:'Web design, marketing',f:'leadgen'},{e:'💬',n:'Customer Support',d:'FAQs, info, 24/7',f:'support'},{e:'🏢',n:'General Business',d:'General retail',f:'commerce'}];
+const fl={booking:'Booking',commerce:'Commerce',leadgen:'Lead Gen',support:'Support'};
+const fc={booking:'flow-booking',commerce:'flow-commerce',leadgen:'flow-leadgen',support:'flow-commerce'};
+const g=document.getElementById('templateGrid');
+templates.forEach(t=>{const c=document.createElement('div');c.className='template-card';c.innerHTML='<div class="emoji">'+t.e+'</div><div class="name">'+t.n+'</div><div class="desc">'+t.d+'</div><span class="flow-tag '+fc[t.f]+'">'+fl[t.f]+'</span>';g.appendChild(c)});
+document.querySelectorAll('a[href^="#"]').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();const t=document.querySelector(a.getAttribute('href'));if(t)t.scrollIntoView({behavior:'smooth'})}));
+</script>
+</body>
+</html>

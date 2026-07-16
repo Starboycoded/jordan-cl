@@ -362,8 +362,8 @@ Be friendly, clear, and concise. Help customers find what they need and complete
 
 # ── Commerce-type templates (use commerce flow) ────
 COMMERCE_TEMPLATES = {"commerce", "fashion", "beauty", "food", "electronics", "general"}
-BOOKING_TEMPLATES  = {"booking"}
-LEADGEN_TEMPLATES  = {"lead_gen"}
+BOOKING_TEMPLATES  = {"booking", "salon", "clinic", "consultant"}
+LEADGEN_TEMPLATES  = {"lead_gen", "real_estate", "agency"}
 SUPPORT_TEMPLATES  = {"support"}
 
 
