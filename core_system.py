@@ -809,33 +809,38 @@ def api_reply(slug: str):
 
 
 
+
+
 @app.route("/api/<slug>/toggle-ai", methods=["POST"])
 def api_toggle_ai(slug: str):
     """Toggle AI auto-responder on/off for a specific phone number."""
-    secret = request.args.get("secret", "") or request.headers.get("X-Admin-Secret", "")
-    if secret != ADMIN_SECRET:
-        from flask import session as flask_session
-        if not flask_session.get("logged_in"):
-            return jsonify({"error": "Unauthorized"}), 403
+    try:
+        secret = request.args.get("secret", "") or request.headers.get("X-Admin-Secret", "")
+        if secret != ADMIN_SECRET:
+            from flask import session as flask_session
+            if not flask_session.get("logged_in"):
+                return jsonify({"error": "Unauthorized"}), 403
 
-    client = db_layer.get_client_by_slug(slug)
-    if not client:
-        return jsonify({"error": "Client not found"}), 404
+        client = db_layer.get_client_by_slug(slug)
+        if not client:
+            return jsonify({"error": "Client not found"}), 404
 
-    data = request.get_json(silent=True) or {}
-    phone = data.get("phone", "").strip()
-    enabled = data.get("enabled", True)
+        data = request.get_json(silent=True) or {}
+        phone = data.get("phone", "").strip()
+        enabled = data.get("enabled", True)
 
-    if not phone:
-        return jsonify({"error": "phone required"}), 400
+        if not phone:
+            return jsonify({"error": "phone required"}), 400
 
-    key = f"{slug}:{phone}"
-    if enabled:
-        AI_PAUSED.pop(key, None)
-    else:
-        AI_PAUSED[key] = True
+        key = f"{slug}:{phone}"
+        if enabled:
+            AI_PAUSED.pop(key, None)
+        else:
+            AI_PAUSED[key] = True
 
-    return jsonify({"success": True, "phone": phone, "ai_enabled": enabled})
+        return jsonify({"success": True, "phone": phone, "ai_enabled": enabled})
+    except Exception as e:
+        return jsonify({"error": str(e), "type": type(e).__name__}), 500
 
 
 @app.route("/api/<slug>/ai-status")
