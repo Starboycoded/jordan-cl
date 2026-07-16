@@ -34,7 +34,7 @@ def is_trigger(message: str, button_id: str) -> bool:
     msg = message.lower().strip()
 
     # Button-based triggers
-    if btn in BUTTON_MAP or btn.startswith(("svc_", "date_", "time_", "bk_", "apt_", "cancel_apt_")):
+    if btn in BUTTON_MAP or btn.startswith(("svc_", "date_", "time_", "bk_", "apt_", "cancel_apt_", "pick_cancel_", "confirm_cancel_")):
         return True
 
     # Text triggers — direct matches
@@ -118,6 +118,15 @@ def handle(phone: str, message: str, button_id: str,
         return
 
     # Cancel specific appointment by ref
+    if btn.startswith("pick_cancel_"):
+        ref = btn.replace("pick_cancel_", "")
+        _show_cancel_confirm(phone, ref, client)
+        return
+    
+    if btn.startswith("confirm_cancel_"):
+        _cancel_appointment(phone, btn.replace("confirm_cancel_", ""), client, session, customer)
+        return
+    
     if btn.startswith("cancel_apt_"):
         _cancel_appointment(phone, btn.replace("cancel_apt_", ""), client, session, customer)
         return
@@ -513,10 +522,35 @@ def _show_cancel_options(phone, client_id, customer_phone, client, customer):
         buttons = []
         for a in active[:3]:
             label = f"{a['ref']} — {a['service_name'][:15]} ({a['date']})"
-            buttons.append({"id": f"cancel_apt_{a['ref']}", "title": label[:20]})
+            buttons.append({"id": f"pick_cancel_{a['ref']}", "title": label[:20]})
         wa.send_buttons(phone,
-            f"📋 You have {len(active)} active appointments. Which would you like to cancel?", 
+            f"📋 You have {len(active)} active appointments. Tap one to review before cancelling:", 
             buttons, client)
+
+
+def _show_cancel_confirm(phone, ref, client):
+    """Show confirmation dialog before cancelling (multi-appointment flow)."""
+    client_id = str(client["id"])
+    currency  = client.get("currency", "NGN")
+    
+    apts = db_layer.get_customer_appointments(client_id, phone)
+    match = next((a for a in (apts or []) if a.get("ref", "").upper() == ref.upper()), None)
+    
+    if not match:
+        wa.send_text(phone, 
+            "I couldn't find that appointment. Type *MY BOOKINGS* to see your appointments.", 
+            client)
+        return
+    
+    wa.send_buttons(phone,
+        f"\u2622\ufe0f *Cancel This Appointment?*\n\n"
+        f"\U0001f522 {match['ref']}\n"
+        f"\U0001f486 {match['service_name']}\n"
+        f"\U0001f4c5 {match['date']} at {match['time']}\n"
+        f"\U0001f4b0 {currency} {int(float(match.get('price',0))):,}\n\n"
+        f"\u26a0\ufe0f This cannot be undone.",
+        [{"id": f"confirm_cancel_{ref}", "title": "\u2705 Yes, Cancel It"},
+         {"id": "bk_mybooks", "title": "\u21a9 No, Keep It"}], client)
 
 
 def _cancel_appointment(phone, ref, client, session, customer):
