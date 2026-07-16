@@ -334,38 +334,37 @@ def onboard_done():
 <div class="done-screen">
   <div class="done-icon">🚀</div>
   <h2>You're live, {name}!</h2>
-  <p>Your WhatsApp store is ready. Here are your links:</p>
+  <p>Your WhatsApp store is ready. Save these links — you'll need them.</p>
 
   <div class="link-cards">
     <a href="{app_url}/shop/{slug}" target="_blank" class="link-card">
       <span class="lc-icon">🛍️</span>
       <div>
         <strong>Your Storefront</strong>
-        <p>{app_url}/shop/{slug}</p>
+        <p>Share this link with customers — {app_url}/shop/{slug}</p>
       </div>
     </a>
     <a href="{app_url}/dashboard/{slug}?secret={secret}" target="_blank" class="link-card">
-      <span class="lc-icon">⚙️</span>
+      <span class="lc-icon">💬</span>
       <div>
-        <strong>Product Dashboard</strong>
-        <p>Manage products, orders, inventory</p>
-      </div>
-    </a>
-    <a href="{app_url}/admin/{slug}?secret={secret}" target="_blank" class="link-card">
-      <span class="lc-icon">📊</span>
-      <div>
-        <strong>Admin Panel</strong>
-        <p>Orders, customers, broadcasts</p>
+        <strong>Dashboard & Live Inbox</strong>
+        <p>Manage products, chat with customers, view appointments</p>
       </div>
     </a>
   </div>
 
+  <div class="secret-box">
+    <strong>🔑 Your Admin Access</strong>
+    <code>{secret}</code>
+    <p>Add <code>?secret={secret}</code> to your dashboard URL to log in. Save this!</p>
+  </div>
+
   <div class="next-steps">
-    <strong>What's next:</strong>
+    <strong>📋 Complete Your Setup:</strong>
     <ol>
-      <li>Share your storefront link on Instagram, Twitter, or with customers directly</li>
-      <li>Add more products from your dashboard</li>
-      <li>Test by sending a WhatsApp message to your connected number</li>
+      <li><strong>Connect WhatsApp</strong> — Dashboard → Settings, enter your Meta phone number ID + token</li>
+      <li><strong>Add your services</strong> — Add products, services, or appointment types from the dashboard</li>
+      <li><strong>Test it live</strong> — Send a WhatsApp message to your connected business number</li>
     </ol>
   </div>
 </div>
@@ -557,3 +556,12 @@ def _step2_form(name: str = "", slug: str = "", template: str = "commerce") -> s
       document.getElementById('template-input').value=key;
     };
     </script>"""
+    # Ensure client record exists (in case they skipped step 3)
+    existing = db_layer.get_client_by_slug(slug)
+    if not existing:
+        db_layer.create_client_record(
+            slug=slug,
+            business_name=name,
+            template=template,
+            currency="NGN"
+        )
