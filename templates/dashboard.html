@@ -445,6 +445,7 @@
         <div class="inbox-sidebar">
           <div class="inbox-sidebar-head">
             <span style="font-weight:700;font-size:13px">💬 Conversations</span>
+            <button class="btn-sm" onclick="window.showNewChat()" style="font-size:11px;background:var(--g);color:#000;border:none;font-weight:700">➕ New</button>
             <span id="conv-count" style="font-size:10px;color:var(--m)">0 chats</span>
             <button class="btn-sm" onclick="loadConversations()" style="font-size:11px">🔄 Refresh</button>
           </div>
@@ -465,6 +466,26 @@
           </div>
         </div>
       </div>
+
+    <!-- New Chat Modal -->
+    <div id="new-chat-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;align-items:center;justify-content:center">
+      <div style="background:var(--s);border:1px solid var(--b);border-radius:14px;padding:24px;width:90%;max-width:420px">
+        <div style="font-weight:700;font-size:15px;margin-bottom:16px">➕ New Conversation</div>
+        <div style="margin-bottom:12px">
+          <label style="font-size:11px;color:var(--m);display:block;margin-bottom:4px">Phone Number (with country code)</label>
+          <input id="new-chat-phone" type="text" class="inp" placeholder="2348012345678" style="width:100%">
+        </div>
+        <div style="margin-bottom:16px">
+          <label style="font-size:11px;color:var(--m);display:block;margin-bottom:4px">First Message</label>
+          <textarea id="new-chat-msg" class="inp" rows="3" placeholder="Hello! This is The Tech Squad..." style="width:100%;resize:vertical"></textarea>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button class="btn" onclick="window.closeNewChat()" style="background:var(--b)">Cancel</button>
+          <button class="btn btn-g" onclick="window.sendNewChat()">📤 Send & Start Chat</button>
+        </div>
+        <div id="new-chat-result" style="margin-top:8px;font-size:11px"></div>
+      </div>
+    </div>
     </div>
 
     <div class="section" id="section-analytics">
@@ -812,6 +833,58 @@ window.toast=function(msg,type){const el=document.getElementById('toast');el.tex
       // Refresh messages
       setTimeout(()=>window.loadMessages(activePhone,true),1000);
     }
+
+    window.showNewChat = function() {
+      document.getElementById('new-chat-modal').style.display = 'flex';
+      document.getElementById('new-chat-phone').value = '';
+      document.getElementById('new-chat-msg').value = '';
+      document.getElementById('new-chat-result').textContent = '';
+      document.getElementById('new-chat-phone').focus();
+    };
+
+    window.closeNewChat = function() {
+      document.getElementById('new-chat-modal').style.display = 'none';
+    };
+
+    window.sendNewChat = async function() {
+      const phone = document.getElementById('new-chat-phone').value.trim();
+      const msg = document.getElementById('new-chat-msg').value.trim();
+      const result = document.getElementById('new-chat-result');
+      
+      if (!phone || !msg) { result.textContent = 'Phone and message required'; result.style.color = '#ef4444'; return; }
+      if (!/^\d+$/.test(phone)) { result.textContent = 'Phone must be numbers only (e.g. 2348012345678)'; result.style.color = '#ef4444'; return; }
+      
+      result.textContent = 'Sending...';
+      result.style.color = 'var(--m)';
+      
+      try {
+        const r = await fetch(`/api/${SLUG}/reply?secret=${SECRET}`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({phone: phone, message: msg})
+        });
+        const d = await r.json();
+        if (d.success) {
+          result.textContent = '✅ Sent! Loading conversation...';
+          result.style.color = '#22c55e';
+          window.closeNewChat();
+          await loadConversations();
+          // Select the new conversation
+          setTimeout(() => window.selectConversation(phone), 500);
+        } else {
+          result.textContent = 'Failed: ' + (d.error || 'Unknown error');
+          result.style.color = '#ef4444';
+        }
+      } catch(e) {
+        result.textContent = 'Error: ' + e.message;
+        result.style.color = '#ef4444';
+      }
+    };
+
+    // Close modal on backdrop click
+    document.addEventListener('click', function(e) {
+      if (e.target.id === 'new-chat-modal') window.closeNewChat();
+    });
 
     window.escHtml=function(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 

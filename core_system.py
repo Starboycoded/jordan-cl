@@ -827,6 +827,9 @@ def api_reply(slug: str):
     if not phone or not message:
         return jsonify({"error": "phone and message required"}), 400
 
+    # Log outgoing message to inbox
+    db_layer.log_message(str(client["id"]), phone, "outgoing", message, None, "merchant")
+
     import whatsapp as wa
     success = wa.send_text(phone, message, client)
     return jsonify({"success": success, "phone": phone})
