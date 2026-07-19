@@ -158,11 +158,13 @@ def is_slot_available(client_id: str, apt_date: str, apt_time: str,
     Blocked statuses: pending, confirmed. (cancelled/no_show free the slot.)
     """
     try:
+        # Normalize time for case-insensitive comparison
+        apt_time_norm = apt_time.strip().upper() if apt_time else apt_time
         q = db().table("appointments")\
             .select("id")\
             .eq("client_id", client_id)\
             .eq("date", apt_date)\
-            .eq("time", apt_time)\
+            .eq("time", apt_time_norm)\
             .in_("status", ["pending", "confirmed"])
 
         if exclude_ref:
@@ -189,8 +191,8 @@ def get_available_slots(client_id: str, apt_date: str,
             .in_("status", ["pending", "confirmed"])\
             .execute()
 
-        booked = {row["time"] for row in (result.data or [])}
-        return [s for s in all_slots if s not in booked]
+        booked = {row["time"].strip().upper() for row in (result.data or []) if row.get("time")}
+        return [s for s in all_slots if s.strip().upper() not in booked]
     except Exception as e:
         logger.error(f"[Availability] get_available_slots: {e}")
         return all_slots    # fail open

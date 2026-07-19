@@ -357,7 +357,13 @@ def _select_time(phone, time_label, client, session, customer):
         wa.send_text(phone, conflict_msg, client)
         return
 
-    session["booking"]["time"] = time_label
+    # Normalize time format to prevent case-sensitivity clashes
+    parsed = _parse_time_str(time_label)
+    if parsed:
+        normalized_time = _minutes_to_time_str(parsed[0] * 60 + parsed[1])
+    else:
+        normalized_time = time_label.strip().upper()
+    session["booking"]["time"] = normalized_time
     session["state"]           = "awaiting_notes"
     _save(client_id, phone, session)
 

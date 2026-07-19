@@ -383,6 +383,17 @@ def create_appointment(client_id: str, phone: str, service_name: str,
         count   = (count_r.count or 0) + 1
         ref     = f"APT-{today}-{count:04d}"
 
+        # Normalize time to consistent format (prevent AM/am clashes)
+        try:
+            from availability import _parse_time_str, _minutes_to_time_str
+            parsed = _parse_time_str(time)
+            if parsed:
+                time = _minutes_to_time_str(parsed[0] * 60 + parsed[1])
+            else:
+                time = time.strip().upper() if time else time
+        except Exception:
+            pass
+
         r = db().table("appointments").insert({
             "client_id":    client_id,
             "ref":          ref,
