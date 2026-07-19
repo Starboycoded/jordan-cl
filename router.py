@@ -50,7 +50,9 @@ def route(phone: str, message: str, button_id: str,
             return
 
     # ── 2. COMMERCE MODULE ───────────────────────────
-    if modules.get("commerce"):
+    # Skip commerce if customer is mid-booking (prevents checkout hijacking)
+    booking_states = ("awaiting_date", "awaiting_time", "awaiting_notes", "confirm_booking")
+    if modules.get("commerce") and session.get("state") not in booking_states:
         if commerce_mod.is_trigger(message, button_id) or \
            session.get("state") in ("awaiting_address", "confirm_order", "confirm_clear"):
             commerce_mod.handle(phone, message, button_id, client, session, customer)
