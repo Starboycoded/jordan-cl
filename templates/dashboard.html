@@ -246,7 +246,7 @@
 <div class="wrap">
 
 {% if modules.commerce %}
-<div class="section active" id="section-products">
+<div class="section" id="section-products">
   {% if low_stock %}<div class="alert">⚠️ Low / out of stock: {{ low_stock | join(', ') }}</div>{% endif %}
   <div class="card">
     <div class="card-head">
@@ -330,7 +330,7 @@
 {% endif %}
 
 {% if modules.booking %}
-<div class="section {% if not modules.commerce %}active{% endif %}" id="section-appointments">
+<div class="section" id="section-appointments">
   <div class="card">
     <div class="card-head">
       <span>📅 Appointments</span>
@@ -385,7 +385,7 @@
 {% endif %}
 
 {% if modules.leadgen %}
-<div class="section {% if not modules.commerce and not modules.booking %}active{% endif %}" id="section-leads">
+<div class="section" id="section-leads">
   <div class="card">
     <div class="card-head"><span>🔥 Lead Pipeline</span></div>
     <div class="pipeline">
@@ -451,7 +451,7 @@
   </div>
 </div>
 
-<div class="section" id="section-inbox">
+<div class="section {% if first %}active{% endif %}" id="section-inbox">
       <div class="inbox-layout">
         <div class="inbox-sidebar">
           <div class="inbox-sidebar-head">
